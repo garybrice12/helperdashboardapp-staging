@@ -1,0 +1,9 @@
+{
+  "name": "Helper Dashboard",
+  "short_name": "Helper",
+  "start_url": "./#overview",
+  "display": "standalone",
+  "background_color": "#f6f7f9",
+  "theme_color": "#2783de",
+  "description": "Helper shifts, availability and pay progress in one place."
+}

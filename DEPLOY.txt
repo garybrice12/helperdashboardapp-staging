@@ -1,0 +1,11 @@
+UPLOAD THIS ZIP AS THE NEW MANUAL NETLIFY DEPLOY.
+It replaces the root dashboard and adds an in-dashboard Helper Assistant at #ask-ai.
+Before testing, add OPENAI_API_KEY in Netlify environment variables as explained in AI-SETUP.txt.
+The Notion Helper Dashboard should link to https://helperdashboardapp.netlify.app/#ask-ai.
+
+PERSISTENT DATA UPDATE
+- Dashboard data is stored in Netlify Blobs under the global store `helper-dashboard-data`.
+- GET /api/dashboard-data reads the current record.
+- POST /api/dashboard-data accepts a complete or partial JSON object with `Authorization: Bearer $DASHBOARD_UPDATE_TOKEN`.
+- Set DASHBOARD_UPDATE_TOKEN in Netlify environment variables before using POST updates.
+- The frontend reads the persistent record on every page load, so routine shift updates do not require a redeploy.
