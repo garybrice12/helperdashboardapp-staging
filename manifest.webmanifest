@@ -1,14 +1,9 @@
 {
-  "name": "Helper Dashboard — Gary’s Quick Delivery Service",
+  "name": "Helper Dashboard",
   "short_name": "Helper",
   "start_url": "./#overview",
-  "scope": "./",
   "display": "standalone",
-  "background_color": "#05080d",
-  "theme_color": "#0b1a2d",
-  "description": "Live helper shifts, availability and pay progress.",
-  "icons": [
-    {"src":"/icons/gqs-icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
-    {"src":"/icons/gqs-icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
-  ]
+  "background_color": "#f6f7f9",
+  "theme_color": "#2783de",
+  "description": "Helper shifts, availability and pay progress in one place."
 }

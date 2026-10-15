@@ -4,10 +4,9 @@ const STORE_NAME = 'helper-dashboard-data';
 const KEY = 'current';
 
 const DEFAULT_DATA = {
-  nextShift: { date:'', day:'No upcoming helper shift', location:'No confirmed helper shift', start:'', end:'', status:'No upcoming helper shift', responseDeadline:'', finalConfirmation:'', targetGross:null, targetTrips:null, estimatedHelperPay:null, plannedHours:null, quest:'No upcoming confirmed Quest shift' },
-  recentShift: null,
-  latestPayment: null,
-  currentlyOwed: null
+  nextShift: { date:'2026-09-16', day:'Wed 16 Sep', location:'Exmouth', start:'5:00pm', end:'9:00pm', status:'Confirmation pending', responseDeadline:'4pm', finalConfirmation:'4:30pm', targetGross:60, targetTrips:12, estimatedHelperPay:25, plannedHours:4, quest:'Not currently confirmed' },
+  recentShift: { date:'2026-09-15', day:'Tue 15 Sep', location:'Exmouth', start:'5:00pm', end:'8:38pm', gross:48.80, trips:10, helperTime:'3h 38m', helperPay:17.30 },
+  latestPayment: { amount:47.49, reference:'40', date:'13 September' }
 };
 
 async function getData() {
@@ -28,13 +27,13 @@ function fallback(question, data) {
   const q = question.toLowerCase();
   const n = data.nextShift || DEFAULT_DATA.nextShift;
   const r = data.recentShift || DEFAULT_DATA.recentShift;
-  if (/next|when|shift|work/.test(q)) return n.date ? `The next planned helper shift is ${n.day} in ${n.location}, from ${n.start} to ${n.end}. It is currently ${n.status.toLowerCase()}.` : 'There is no upcoming confirmed helper shift in the live Work Planner.';
-  if (/respond|deadline|confirm|availability|lock/.test(q)) return n.date ? `Please submit or update availability by ${n.responseDeadline}. Final confirmation is sent at ${n.finalConfirmation}.` : 'There is no upcoming confirmed helper shift to confirm in the live Work Planner.';
-  if (/calculate|calculated|pay|split|boost/.test(q)) return n.date ? `Planned helper pay is calculated using the current Helper Day Pay Agreement. The dashboard's current estimate for the next shift is £${Number(n.estimatedHelperPay || 0).toFixed(2)}.` : 'There is no upcoming confirmed helper shift with an estimated helper payment in the live Work Planner.';
+  if (/next|when|shift|work/.test(q)) return `The next planned helper shift is ${n.day} in ${n.location}, from ${n.start} to ${n.end}. It is currently ${n.status.toLowerCase()}.`;
+  if (/respond|deadline|confirm|availability|lock/.test(q)) return `Please submit or update availability by ${n.responseDeadline}. Final confirmation is sent at ${n.finalConfirmation}.`;
+  if (/calculate|calculated|pay|split|boost/.test(q)) return `Planned helper pay is calculated using the current Helper Day Pay Agreement. The dashboard's current estimate for the next shift is £${Number(n.estimatedHelperPay).toFixed(2)}.`;
   if (/quest/.test(q)) return `Quest status for the next shift: ${n.quest}.`;
-  if (/owed|outstanding/.test(q)) return Number.isFinite(Number(data.currentlyOwed)) ? `The Helper Pay Summary currently reports £${Number(data.currentlyOwed).toFixed(2)} outstanding.` : 'The current outstanding balance is unavailable because the live Helper Pay Summary has not loaded.';
-  if (/latest payment|paid|reference/.test(q)) return data.latestPayment ? `The latest recorded payment is £${Number(data.latestPayment.amount || 0).toFixed(2)}, reference ${data.latestPayment.reference || 'not recorded'}.` : 'Latest payment information is unavailable from the live data.';
-  if (/trip/.test(q)) return n.date ? `The next shift has a target of ${n.targetTrips} trips.` : 'There is no upcoming confirmed helper shift with a trip target in the live Work Planner.';
+  if (/owed|outstanding/.test(q)) return `The dashboard currently shows £${Number(r.helperPay).toFixed(2)} from the most recent completed helper shift.`;
+  if (/latest payment|paid|reference/.test(q)) return `The latest recorded payment is £${Number(data.latestPayment?.amount || DEFAULT_DATA.latestPayment.amount).toFixed(2)}, reference ${data.latestPayment?.reference || DEFAULT_DATA.latestPayment.reference}.`;
+  if (/trip/.test(q)) return `The next shift has a target of ${n.targetTrips} trips.`;
   if (/delivery counter|counter/.test(q)) return 'The Delivery Counter is the live shift estimator. Final records use confirmed session and mileage records.';
   return null;
 }

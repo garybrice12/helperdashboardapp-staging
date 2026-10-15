@@ -1,5 +1,4 @@
-// The live shift image is owned by the Notion Graphic Control page, not the dashboard page.
-const NOTION_PAGE_ID = process.env.NOTION_GRAPHIC_CONTROL_PAGE_ID || '3eef475c-d2eb-812d-ace1-c978b4ec3b73';
+const NOTION_PAGE_ID = process.env.NOTION_DASHBOARD_PAGE_ID || 'c5ea7d91-f11c-4e2d-9822-b98b0d42bcf5';
 
 async function notionChildren(blockId) {
   const token = process.env.NOTION_TOKEN;
@@ -37,7 +36,7 @@ export default async (req) => {
   try {
     const index = Math.max(0, Number(new URL(req.url).searchParams.get('index') || 0));
     const images = await findImages(await notionChildren(NOTION_PAGE_ID));
-    const sourceUrl = images[index] || images[0] || images[images.length - 1];
+    const sourceUrl = images[index] || images[images.length - 1];
     if (!sourceUrl) return new Response(`No dashboard image found.`, { status: 404 });
 
     const imageResponse = await fetch(sourceUrl);
