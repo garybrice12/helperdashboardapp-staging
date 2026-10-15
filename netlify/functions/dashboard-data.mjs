@@ -1,91 +1,212 @@
 const STORE_NAME = 'helper-dashboard-data';
 const KEY = 'current';
-const NOTION_DATA_SOURCE_ID = process.env.NOTION_EARNINGS_DATA_SOURCE_ID || '46678020-e282-4699-96bc-c4db27d3af56';
-const NOTION_DASHBOARD_PAGE_ID = process.env.NOTION_DASHBOARD_PAGE_ID || 'c5ea7d91-f11c-4e2d-9822-b98b0d42bcf5';
+
+const NOTION_EARNINGS_ID =
+  process.env.NOTION_EARNINGS_DATA_SOURCE_ID ||
+  '46678020-e282-4699-96bc-c4db27d3af56';
+
+const NOTION_WORK_PLANNER_ID =
+  process.env.NOTION_WORK_PLANNER_DATA_SOURCE_ID ||
+  '5f05970c-fcc0-497b-aa62-3e8edefbbb2b';
+
+const NOTION_HELPER_SUMMARY_ID =
+  process.env.NOTION_HELPER_PAY_SUMMARY_PAGE_ID ||
+  '3f9f475c-d2eb-81ae-812f-e65f142fc1c1';
+
+const NOTION_DASHBOARD_PAGE_ID =
+  process.env.NOTION_DASHBOARD_PAGE_ID ||
+  'c5ea7d91-f11c-4e2d-9822-b98b0d42bcf5';
 
 const DEFAULT_DATA = {
   version: 2,
-  updatedAt: '2026-09-16T00:00:00Z',
-  nextShift: {
-    date: '2026-09-16', day: 'Wed 16 Sep', location: 'Exmouth', start: '5:00pm', end: '9:00pm',
-    status: 'Confirmation pending', responseDeadline: '4pm', finalConfirmation: '4:30pm',
-    targetGross: 60, targetTrips: 12, estimatedHelperPay: 25, plannedHours: 4, quest: 'Not currently confirmed'
+  updatedAt: '',
+  nextShift: null,
+  recentShift: null,
+  latestPayment: null,
+  currentlyOwed: null,
+  syncTestActive: false,
+  trendDemand: {
+    title: 'Trend & demand',
+    summary: 'No new trend/demand graphic has been recorded for the current shift.',
+    imageData: '',
+    updatedAt: ''
   },
-  recentShift: {
-    date: '2026-09-15', day: 'Tue 15 Sep', location: 'Exmouth', start: '5:00pm', end: '8:38pm',
-    gross: 48.80, trips: 10, helperTime: '3h 38m', helperPay: 17.30
-  },
-  latestPayment: {
-    amount: 47.49, reference: '40', date: '13 September',
-    breakdown: [
-      { label: 'Saturday 12 September', detail: '6:04–8:36pm · £18.09' },
-      { label: 'Sunday 13 September', detail: '5:02–8:50pm · £29.40' }
-    ]
-  },
-  trendDemand: { title: 'Trend & demand', summary: 'No new trend/demand graphic has been recorded for the current shift.', imageData: '', updatedAt: '' },
-  currentWeek: { caption: 'Tuesday is complete. Wednesday, Friday and Sunday remain in the current helper forecast.' }
+  currentWeek: {
+    caption: 'No current-week forecast available.'
+  }
 };
 
-function money(n) { return Number.isFinite(Number(n)) ? Number(n) : 0; }
 function propNumber(props, name) {
   const p = props?.[name];
   if (!p) return null;
   if (p.type === 'number') return p.number == null ? null : Number(p.number);
-  if (p.type === 'formula') {
-    const f = p.formula;
-    if (f?.type === 'number') return f.number == null ? null : Number(f.number);
+  if (p.type === 'formula' && p.formula?.type === 'number') {
+    return p.formula.number == null ? null : Number(p.formula.number);
+  }
+  if (p.type === 'rollup') {
+    const r = p.rollup;
+    if (r?.type === 'number') return r.number == null ? null : Number(r.number);
+    if (r?.type === 'array' && Array.isArray(r.array)) {
+      const nums = r.array.map(x => {
+        if (x?.type === 'number') return Number(x.number || 0);
+        if (x?.type === 'formula' && x.formula?.type === 'number') {
+          return Number(x.formula.number || 0);
+        }
+        return null;
+      });
+      if (nums.every(n => n !== null)) return nums.reduce((a, b) => a + b, 0);
+    }
   }
   return null;
 }
+
 function propDate(props, name) {
   const p = props?.[name];
   return p?.type === 'date' ? (p.date?.start || null) : null;
 }
+
 function propTitle(props, name) {
   const p = props?.[name];
-  if (p?.type === 'title') return (p.title || []).map(x => x.plain_text || '').join('').trim();
-  return '';
-}
-function propText(props, name) {
-  const p = props?.[name];
-  if (p?.type === 'rich_text') return (p.rich_text || []).map(x => x.plain_text || '').join('').trim();
+  if (p?.type === 'title') {
+    return (p.title || []).map(x => x.plain_text || '').join('').trim();
+  }
   return '';
 }
 
-async function notionChildren(blockId) {
-  const token = process.env.NOTION_TOKEN;
-  if (!token) throw new Error('NOTION_TOKEN is not configured');
-  const all = [];
-  let cursor = '';
-  do {
-    const url = new URL(`https://api.notion.com/v1/blocks/${blockId}/children`);
-    url.searchParams.set('page_size', '100');
-    if (cursor) url.searchParams.set('start_cursor', cursor);
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}`, 'Notion-Version': '2022-06-28' }
-    });
-    if (!response.ok) throw new Error(`Notion blocks ${response.status}`);
-    const data = await response.json();
-    all.push(...(data.results || []));
-    cursor = data.has_more ? data.next_cursor : '';
-  } while (cursor);
-  return all;
+function propText(props, name) {
+  const p = props?.[name];
+  if (p?.type === 'rich_text') {
+    return (p.rich_text || []).map(x => x.plain_text || '').join('').trim();
+  }
+  if (p?.type === 'select') return p.select?.name || '';
+  if (p?.type === 'status') return p.status?.name || '';
+  return '';
+}
+
+function propCheckbox(props, name) {
+  return props?.[name]?.type === 'checkbox'
+    ? props[name].checkbox === true
+    : false;
 }
 
 function richTextPlain(items) {
   return (items || []).map(x => x.plain_text || x.text?.content || '').join('');
 }
 
+function displayDate(value, includeYear = false) {
+  if (!value) return '';
+  return new Date(`${value}T12:00:00Z`).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    ...(includeYear ? { year: 'numeric' } : {}),
+    timeZone: 'UTC'
+  });
+}
+
+function weekdayDate(value) {
+  if (!value) return '';
+  return new Date(`${value}T12:00:00Z`).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC'
+  });
+}
+
+function durationText(hours) {
+  if (!Number.isFinite(hours)) return '';
+  const mins = Math.round(hours * 60);
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h ? `${h}h${m ? ` ${m}m` : ''}` : `${m}m`;
+}
+
+function extractTime(notes) {
+  const m = String(notes || '').match(/(\d{1,2}:\d{2})[–-](\d{1,2}:\d{2})/);
+  return m ? `${m[1]}–${m[2]}` : '';
+}
+
+function money(value) {
+  return Math.round(Number(value || 0) * 100) / 100;
+}
+
+async function notionRequest(url, options = {}) {
+  const token = process.env.NOTION_TOKEN;
+  if (!token) throw new Error('NOTION_TOKEN is not configured');
+
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Notion-Version': '2025-09-03',
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Notion API ${response.status}: ${await response.text()}`);
+  }
+  return response.json();
+}
+
+async function queryDataSource(dataSourceId) {
+  const results = [];
+  let cursor;
+
+  do {
+    const data = await notionRequest(
+      `https://api.notion.com/v1/data_sources/${dataSourceId}/query`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          page_size: 100,
+          ...(cursor ? { start_cursor: cursor } : {})
+        })
+      }
+    );
+
+    results.push(...(data.results || []));
+    cursor = data.has_more ? data.next_cursor : null;
+  } while (cursor);
+
+  return results;
+}
+
+async function getPageBlocks(pageId) {
+  const results = [];
+  let cursor;
+
+  do {
+    const url = new URL(`https://api.notion.com/v1/blocks/${pageId}/children`);
+    url.searchParams.set('page_size', '100');
+    if (cursor) url.searchParams.set('start_cursor', cursor);
+
+    const data = await notionRequest(url.toString());
+    results.push(...(data.results || []));
+    cursor = data.has_more ? data.next_cursor : null;
+  } while (cursor);
+
+  return results;
+}
+
 async function getSyncTestData() {
-  const blocks = await notionChildren(NOTION_DASHBOARD_PAGE_ID);
-  const callout = blocks.find(b => b.type === 'callout' && /SYNC TEST DATA/i.test(richTextPlain(b.callout?.rich_text)));
+  const blocks = await getPageBlocks(NOTION_DASHBOARD_PAGE_ID);
+  const callout = blocks.find(
+    b => b.type === 'callout' &&
+      /SYNC TEST DATA/i.test(richTextPlain(b.callout?.rich_text))
+  );
+
   if (!callout) return null;
+
   const text = richTextPlain(callout.callout?.rich_text);
   const owed = text.match(/Currently owed:\s*£?([0-9]+(?:\.[0-9]{1,2})?)/i);
   const payment = text.match(/Latest payment:\s*£?([0-9]+(?:\.[0-9]{1,2})?)/i);
   const ref = text.match(/Reference\s+([^·\n]+)/i);
   const date = text.match(/·\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})/i);
+
   if (!owed || !payment) return null;
+
   return {
     currentlyOwed: Number(owed[1]),
     latestPayment: {
@@ -97,137 +218,216 @@ async function getSyncTestData() {
   };
 }
 
-async function notionQueryAll() {
-  const token = process.env.NOTION_TOKEN;
-  if (!token) throw new Error('NOTION_TOKEN is not configured');
-  const all = [];
-  let cursor;
-  do {
-    const response = await fetch(`https://api.notion.com/v1/data_sources/${NOTION_DATA_SOURCE_ID}/query`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Notion-Version': '2025-09-03',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        page_size: 100,
-        sorts: [{ property: 'Date', direction: 'descending' }],
-        ...(cursor ? { start_cursor: cursor } : {})
-      })
-    });
-    if (!response.ok) throw new Error(`Notion data source query ${response.status}: ${await response.text()}`);
-    const data = await response.json();
-    all.push(...(data.results || []));
-    cursor = data.has_more ? data.next_cursor : null;
-  } while (cursor);
-  return all;
+async function getHelperSummaryOutstanding() {
+  const page = await notionRequest(
+    `https://api.notion.com/v1/pages/${NOTION_HELPER_SUMMARY_ID}`
+  );
+
+  const props = page.properties || {};
+
+  // Use the summary's outstanding rollup as the source of truth.
+  for (const name of [
+    'Total outstanding (£)',
+    'Total outstanding',
+    'Outstanding (£)',
+    'Outstanding'
+  ]) {
+    const value = propNumber(props, name);
+    if (value !== null) return money(value);
+  }
+
+  throw new Error(
+    'Could not read the outstanding rollup from the Helper Pay Summary page. Check its exact property name and type.'
+  );
 }
 
-function durationText(hours) {
-  if (!Number.isFinite(hours)) return '';
-  const mins = Math.round(hours * 60);
-  const h = Math.floor(mins / 60), m = mins % 60;
-  return h ? `${h}h${m ? ` ${m}m` : ''}` : `${m}m`;
-}
-function displayDate(value) {
-  if (!value) return '';
-  return new Date(`${value}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
-}
-function extractTime(notes) {
-  const m = String(notes || '').match(/(\d{1,2}:\d{2})[–-](\d{1,2}:\d{2})/);
-  return m ? `${m[1]}–${m[2]}` : '';
+function mapEarningsPage(page) {
+  const p = page.properties || {};
+  const notes = propText(p, 'Notes');
+  const date = propDate(p, 'Date');
+
+  return {
+    page,
+    day: propTitle(p, 'Day'),
+    date,
+    paidDate: propDate(p, 'Date paid'),
+    gross: propNumber(p, 'Gross (£)') ?? 0,
+    miles: propNumber(p, 'Miles') ?? 0,
+    trips: propNumber(p, 'Trips/deliveries') ?? 0,
+    withHelper: propCheckbox(p, 'With helper'),
+    helperPaid: propNumber(p, 'Helper paid (£)') ?? 0,
+    helperPayout: propNumber(p, 'Helper payout (£)'),
+    paymentRef: propNumber(p, 'Payment ref'),
+    helperHours: propNumber(p, 'Helper hours'),
+    notes,
+    boost: propNumber(p, 'Boost (£)') ??
+      propNumber(p, 'Trip boost (£)') ??
+      propNumber(p, 'Quest bonus (£)'),
+    boostEligible: propCheckbox(p, 'Boost eligible') ||
+      propCheckbox(p, 'Trip boost eligible')
+  };
 }
 
-async function getNotionData(base) {
-  const pages = await notionQueryAll();
-  const rows = pages.map(page => {
+function makeLatestPayment(rows, fallback) {
+  const paidRows = rows.filter(r => r.withHelper && r.paidDate && r.paymentRef != null);
+  if (!paidRows.length) return fallback;
+
+  const latestDate = paidRows.map(r => r.paidDate).sort().at(-1);
+  const latestRef = paidRows
+    .filter(r => r.paidDate === latestDate)
+    .map(r => r.paymentRef)
+    .sort((a, b) => a - b)
+    .at(-1);
+
+  const paymentRows = paidRows.filter(
+    r => r.paidDate === latestDate && r.paymentRef === latestRef
+  );
+
+  const amount = paymentRows.reduce((sum, r) => sum + r.helperPaid, 0);
+
+  return {
+    amount: money(amount),
+    reference: String(latestRef),
+    date: displayDate(latestDate),
+    breakdown: paymentRows.map(r => ({
+      label: r.day.replace(/\s+—\s+.*$/, '') || r.day,
+      detail: `${extractTime(r.notes)}${extractTime(r.notes) ? ' · ' : ''}£${r.helperPaid.toFixed(2)}`
+    }))
+  };
+}
+
+function makeRecentShift(rows, fallback) {
+  const recent = rows
+    .filter(r => r.withHelper && r.date)
+    .sort((a, b) => b.date.localeCompare(a.date))[0];
+
+  if (!recent) return fallback;
+
+  return {
+    date: recent.date,
+    day: weekdayDate(recent.date),
+    location: /Exmouth/i.test(recent.notes) ? 'Exmouth' : '',
+    start: extractTime(recent.notes)?.split('–')[0] || '',
+    end: extractTime(recent.notes)?.split('–')[1] || '',
+    gross: recent.gross,
+    trips: recent.trips,
+    helperTime: recent.helperHours != null ? durationText(recent.helperHours) : '',
+    helperPay: recent.helperPayout != null ? money(recent.helperPayout) : null,
+    boost: recent.boost,
+    boostEligible: recent.boostEligible
+  };
+}
+
+function makeNextShift(pages) {
+  const today = new Date().toISOString().slice(0, 10);
+
+  const candidates = pages.map(page => {
     const p = page.properties || {};
     return {
-      page,
-      day: propTitle(p, 'Day'),
       date: propDate(p, 'Date'),
-      paidDate: propDate(p, 'Date paid'),
-      gross: propNumber(p, 'Gross (£)') || 0,
-      miles: propNumber(p, 'Miles') || 0,
-      trips: propNumber(p, 'Trips/deliveries') || 0,
-      withHelper: p['With helper']?.checkbox === true,
-      helperPaid: propNumber(p, 'Helper paid (£)') || 0,
-      helperOutstanding: propNumber(p, 'Helper outstanding (£)'),
-      helperPayout: propNumber(p, 'Helper payout (£)'),
-      paymentRef: propNumber(p, 'Payment ref'),
-      helperHours: propNumber(p, 'Helper hours'),
-      notes: propText(p, 'Notes')
+      day: propTitle(p, 'Day'),
+      location: propText(p, 'Location') || propText(p, 'Area'),
+      start: propText(p, 'Start time') || propText(p, 'Start'),
+      end: propText(p, 'End time') || propText(p, 'Finish time') || propText(p, 'End'),
+      status: propText(p, 'Status'),
+      crew: propText(p, 'Crew') || propText(p, 'With helper'),
+      quest: propCheckbox(p, 'Quest') ? 'Confirmed' : 'Not confirmed',
+      targetGross: propNumber(p, 'Target gross (£)') ?? propNumber(p, 'Target gross'),
+      targetTrips: propNumber(p, 'Target trips'),
+      plannedHours: propNumber(p, 'Planned hours')
     };
   });
 
-  const helperRows = rows.filter(r => r.withHelper);
-  const owed = helperRows.reduce((sum, r) => sum + (r.helperOutstanding ?? Math.max(0, (r.helperPayout || 0) - (r.helperPaid || 0))), 0);
+  const upcoming = candidates
+    .filter(s => s.date && s.date >= today &&
+      !/complete|cancel|declined/i.test(s.status || ''))
+    .sort((a, b) => a.date.localeCompare(b.date));
 
-  const paidRows = helperRows.filter(r => r.paidDate && r.paymentRef != null);
-  let latestPayment = base.latestPayment;
-  if (paidRows.length) {
-    const latestDate = paidRows.map(r => r.paidDate).sort().at(-1);
-    const latestRef = paidRows.filter(r => r.paidDate === latestDate).map(r => r.paymentRef).sort((a,b) => a-b).at(-1);
-    const paymentRows = paidRows.filter(r => r.paidDate === latestDate && r.paymentRef === latestRef);
-    const amount = paymentRows.reduce((sum, r) => sum + (r.helperPaid || 0), 0);
-    latestPayment = {
-      amount: Math.round(amount * 100) / 100,
-      reference: String(latestRef),
-      date: displayDate(latestDate),
-      breakdown: paymentRows.slice().sort((a,b) => String(a.date).localeCompare(String(b.date))).map(r => ({
-        label: r.day.replace(/^.*?—\s*/, '').replace(/\s+(?:helper|evening|afternoon|morning).*$/i, '') || r.day,
-        detail: `${extractTime(r.notes)}${extractTime(r.notes) ? ' · ' : ''}£${(r.helperPaid || 0).toFixed(2)}`
-      }))
-    };
-    // Prefer the actual day title for the two current payment rows.
-    latestPayment.breakdown = paymentRows.map(r => ({
-      label: r.day.replace(/\s+—\s+.*$/, ''),
-      detail: `${extractTime(r.notes)}${extractTime(r.notes) ? ' · ' : ''}£${(r.helperPaid || 0).toFixed(2)}`
-    }));
-  }
+  if (!upcoming.length) return null;
 
-  const recent = rows.find(r => r.withHelper && r.date === rows.find(x => x.withHelper)?.date) || helperRows[0];
-  const recentShift = recent ? {
-    ...base.recentShift,
-    date: recent.date,
-    day: recent.date ? new Date(`${recent.date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : base.recentShift.day,
-    gross: recent.gross,
-    trips: recent.trips,
-    helperPay: recent.helperPayout != null ? Math.round(recent.helperPayout * 100) / 100 : base.recentShift.helperPay,
-    helperTime: recent.helperHours != null ? durationText(recent.helperHours) : base.recentShift.helperTime,
-    location: /Exmouth/i.test(recent.notes) ? 'Exmouth' : base.recentShift.location,
-    start: extractTime(recent.notes)?.split('–')[0] || base.recentShift.start,
-    end: extractTime(recent.notes)?.split('–')[1] || base.recentShift.end
-  } : base.recentShift;
-
-  const syncTest = await getSyncTestData().catch(() => null);
+  const shift = upcoming[0];
   return {
-    ...base,
-    updatedAt: new Date().toISOString(),
-    recentShift,
-    latestPayment: syncTest?.latestPayment || latestPayment,
-    currentlyOwed: syncTest ? Math.round(syncTest.currentlyOwed * 100) / 100 : Math.round(owed * 100) / 100,
-    syncTestActive: Boolean(syncTest)
+    ...shift,
+    day: shift.day || weekdayDate(shift.date),
+    status: shift.status || 'Pending confirmation',
+    responseDeadline: '',
+    finalConfirmation: '',
+    estimatedHelperPay: null
   };
 }
 
 async function getData() {
-  const fallback = DEFAULT_DATA;
-  try { return await getNotionData(fallback); }
-  catch (error) {
-    console.error('Notion dashboard sync failed; falling back to stored data', error?.message || error);
+  const [earningsPages, plannerPages, summaryOwed] = await Promise.all([
+    queryDataSource(NOTION_EARNINGS_ID),
+    queryDataSource(NOTION_WORK_PLANNER_ID),
+    getHelperSummaryOutstanding()
+  ]);
+
+  const rows = earningsPages.map(mapEarningsPage)
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+
+  const nextShift = makeNextShift(plannerPages);
+  const recentShift = makeRecentShift(rows, null);
+  const latestPayment = makeLatestPayment(rows, null);
+
+  const syncTest = await getSyncTestData().catch(() => null);
+
+  return {
+    ...DEFAULT_DATA,
+    updatedAt: new Date().toISOString(),
+    nextShift,
+    recentShift,
+    latestPayment: syncTest?.latestPayment || latestPayment,
+    currentlyOwed: syncTest
+      ? money(syncTest.currentlyOwed)
+      : money(summaryOwed),
+    syncTestActive: Boolean(syncTest),
+    tripBoost: recentShift?.boost ?? null
+  };
+}
+
+async function getDataSafe() {
+  try {
+    return await getData();
+  } catch (error) {
+    console.error('Notion dashboard sync failed', error?.message || error);
+
     try {
       const { getStore } = await import('@netlify/blobs');
       const store = getStore(STORE_NAME, { consistency: 'strong' });
       const value = await store.get(KEY, { type: 'json' });
-      return value || fallback;
-    } catch { return { ...fallback, storageUnavailable: true }; }
+
+      // Never show stale September fallback data as a real upcoming shift.
+      return {
+        ...DEFAULT_DATA,
+        ...(value || {}),
+        nextShift: null,
+        syncError: true,
+        syncErrorMessage: 'Live Notion data could not be loaded.'
+      };
+    } catch {
+      return {
+        ...DEFAULT_DATA,
+        nextShift: null,
+        currentlyOwed: null,
+        storageUnavailable: true,
+        syncError: true
+      };
+    }
   }
 }
 
-export default async (req) => {
-  if (req.method === 'GET') return Response.json(await getData(), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
-  return new Response('Method not allowed', { status: 405 });
+export default async req => {
+  if (req.method !== 'GET') {
+    return new Response('Method not allowed', { status: 405 });
+  }
+
+  return Response.json(await getDataSafe(), {
+    headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+  });
 };
-export const config = { path: '/api/dashboard-data', method: ['GET'] };
+
+export const config = {
+  path: '/api/dashboard-data',
+  method: ['GET']
+};
