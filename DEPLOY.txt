@@ -19,3 +19,9 @@ LIVE DATA CONTRACT (updated 15 October 2026)
 - Only future Work Planner shifts with Status Confirmed or Live and Crew With helper are shown as upcoming. Available shifts are not treated as confirmed.
 - If the Notion connection fails, the dashboard shows a sync-unavailable state instead of presenting old example figures as live.
 - App icon assets are in /icons and use the Gary’s Quick Delivery Service emblem.
+
+
+OUTSTANDING BALANCE SOURCE
+- All-time outstanding is read from the Helper Pay Summary page `Current helper outstanding`, rollup property `Total outstanding (£)`.
+- Optional `NOTION_HELPER_PAY_SUMMARY_PAGE_ID` defaults to `3f9f475c-d2eb-81ae-812f-e65f142fc1c1`.
+- Ensure the existing NOTION_TOKEN integration can read the Helper Pay Summary page as well as the Work Planner and Earnings Log.

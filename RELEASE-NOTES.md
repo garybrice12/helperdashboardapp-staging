@@ -34,3 +34,10 @@ Do not put tokens in HTML or commit them to Git. Preserve existing Netlify envir
 ## Not yet verified
 - The deployed Netlify environment’s actual `NOTION_TOKEN` and `OPENAI_API_KEY` values and permissions were not accessible from this build workspace.
 - No production deployment was performed. Test the staging deploy against the live Notion records before promoting it to production.
+
+
+## Helper Pay Summary outstanding source
+- The all-time dashboard outstanding figure now reads the `Total outstanding (£)` rollup from the `Current helper outstanding` page in the Helper Pay Summary database (page ID `3f9f475c-d2eb-81ae-812f-e65f142fc1c1`).
+- The earnings log remains the source for shift detail, payment breakdowns, and current-week statistics.
+- If the summary rollup cannot be retrieved or is not numeric, the API reports live data unavailable rather than silently reverting to the old recalculated historical shortfall.
+- Optional environment variable: `NOTION_HELPER_PAY_SUMMARY_PAGE_ID`; defaults to the page ID above.
