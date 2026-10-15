@@ -1,11 +1,21 @@
-UPLOAD THIS ZIP AS THE NEW MANUAL NETLIFY DEPLOY.
-It replaces the root dashboard and adds an in-dashboard Helper Assistant at #ask-ai.
-Before testing, add OPENAI_API_KEY in Netlify environment variables as explained in AI-SETUP.txt.
-The Notion Helper Dashboard should link to https://helperdashboardapp.netlify.app/#ask-ai.
+SOURCE PACKAGE FOR THE EXISTING GITHUB-CONNECTED NETLIFY PROJECT.
+Apply these files to the existing repository root and let the connected Netlify build run. This package includes Netlify Functions, so use the build pipeline rather than a static drag-and-drop deploy. It replaces the root dashboard and keeps the in-dashboard Helper Assistant at #ask-ai.
+Before testing, ensure OPENAI_API_KEY and NOTION_TOKEN are configured in Netlify environment variables. See AI-SETUP.txt for the AI key.
+The existing production URL and helper-facing links should remain unchanged until the staged build has been tested and explicitly approved for promotion.
 
-PERSISTENT DATA UPDATE
-- Dashboard data is stored in Netlify Blobs under the global store `helper-dashboard-data`.
-- GET /api/dashboard-data reads the current record.
-- POST /api/dashboard-data accepts a complete or partial JSON object with `Authorization: Bearer $DASHBOARD_UPDATE_TOKEN`.
-- Set DASHBOARD_UPDATE_TOKEN in Netlify environment variables before using POST updates.
-- The frontend reads the persistent record on every page load, so routine shift updates do not require a redeploy.
+LIVE DATA UPDATE
+- GET /api/dashboard-data reads directly from the live Notion data sources on each page load.
+- This build does not use a POST update endpoint or Netlify Blobs as the source of truth. Shift and earnings updates must be made in the existing Notion databases.
+Live Notion data:
+- Required Netlify environment variable: NOTION_TOKEN (private Notion integration token with access to both the Earnings log (new) and Work Planner — Shifts data sources).
+- Optional NOTION_EARNINGS_DATA_SOURCE_ID defaults to the Earnings log (new) data source.
+- Optional NOTION_SHIFTS_DATA_SOURCE_ID defaults to the Work Planner — Shifts data source.
+- Redeploy after changing environment variables. Never put NOTION_TOKEN in browser HTML or commit it to Git.
+
+LIVE DATA CONTRACT (updated 15 October 2026)
+- Earnings Log data source: 46678020-e282-4699-96bc-c4db27d3af56
+- Work Planner — Shifts data source: 5f05970c-fcc0-497b-aa62-3e8edefbbb2b
+- The dashboard calculates current outstanding from helper earnings records and builds Monday–Sunday weekly totals from those records.
+- Only future Work Planner shifts with Status Confirmed or Live and Crew With helper are shown as upcoming. Available shifts are not treated as confirmed.
+- If the Notion connection fails, the dashboard shows a sync-unavailable state instead of presenting old example figures as live.
+- App icon assets are in /icons and use the Gary’s Quick Delivery Service emblem.

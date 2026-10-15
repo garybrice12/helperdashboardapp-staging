@@ -9,6 +9,9 @@
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
 <meta content="Helper shifts, availability and pay progress in one place." name="description"/>
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/gqs-icon-192.png"/>
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+<link rel="manifest" href="/manifest.webmanifest"/>
 <title>Helper Dashboard</title>
 <style>
     :root{--bg:#f6f7f9;--surface:#fff;--soft:#eef6fd;--text:#242424;--muted:#6f7479;--border:#e5e7eb;--blue:#2783de;--green:#25865a;--green-soft:#e8f4ed;--orange:#ad6429;--orange-soft:#fff1e5;--radius:14px;--shadow:0 1px 2px rgba(0,0,0,.04),0 8px 28px rgba(20,35,50,.06)}
@@ -26,35 +29,55 @@
 
     .ai-shell{display:grid;gap:12px}.ai-header{display:flex;align-items:flex-start;gap:12px}.ai-back{flex:0 0 44px;height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font-size:22px;cursor:pointer}.ai-back:hover{background:var(--soft)}.ai-intro h2{font-size:22px;margin:0 0 5px}.ai-thread{min-height:230px;max-height:52vh;overflow:auto;padding:4px 0;display:grid;gap:10px;align-content:start}.message{max-width:88%;padding:11px 13px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}.message.assistant{justify-self:start;background:var(--soft);color:var(--text);border:1px solid #cce3f7}.message.user{justify-self:end;background:var(--blue);color:#fff}.message.error{justify-self:start;background:var(--orange-soft);color:var(--text);border:1px solid #efc49f}.suggestions{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:thin}.suggestion{flex:0 0 auto;min-height:44px;padding:9px 12px;border:1px solid #acd1f3;border-radius:10px;background:var(--surface);color:var(--blue);font-weight:750;cursor:pointer}.ai-form{display:grid;grid-template-columns:1fr auto;gap:8px}.ai-input{min-width:0;min-height:48px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);padding:11px 12px;font:inherit}.ai-input:focus{outline:3px solid #8ec3f1;outline-offset:1px}.ai-send{min-width:74px;min-height:48px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:800;padding:0 16px;cursor:pointer}.ai-send:disabled{opacity:.6;cursor:wait}.ai-note{font-size:12px;color:var(--muted);margin:0}.ai-back:focus-visible,.suggestion:focus-visible,.ai-send:focus-visible{outline:3px solid #8ec3f1;outline-offset:2px}
 </style>
+
+<style>
+.brand-icon{overflow:hidden;background:#05080d;border:1px solid #173b64;box-shadow:0 4px 14px rgba(25,118,210,.22)}
+.brand-icon img{display:block;width:100%;height:100%;object-fit:cover}
+.live-graphic{padding:20px;background:linear-gradient(140deg,#05080d 0%,#0b1a2d 55%,#07101b 100%);color:#f7fbff;border:1px solid #1c4e7d;border-radius:12px;overflow:hidden}
+.week-graphic{background:linear-gradient(140deg,#071a25 0%,#102d3b 58%,#08131f 100%);border-color:#246c79}
+.graphic-kicker{font-size:10px;font-weight:900;letter-spacing:.12em;color:#59d4ff;text-transform:uppercase}
+.week-graphic .graphic-kicker{color:#73e0aa}
+.live-graphic h3{font-size:23px;line-height:1.2;margin:8px 0;color:#fff}
+.graphic-location{margin:0;color:#c4d5e7;font-size:14px}
+.graphic-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:16px}
+.graphic-stats>div{padding:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:9px;min-width:0}
+.graphic-stats b{display:block;font-size:19px;line-height:1.2;color:#fff;overflow-wrap:anywhere}
+.graphic-stats span{display:block;font-size:11px;color:#bfd0df;margin-top:4px}
+.graphic-footer{margin:14px 0 0;color:#c7d9e8;font-size:12px}
+#connection-status .dot{background:#20b777}
+#connection-status.sync-error{color:#b45309}
+#connection-status.sync-error .dot{background:#d97706}
+@media(min-width:620px){.graphic-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.live-graphic{padding:24px}}
+</style>
 </head>
 <body>
-<header class="top"><div class="shell top-inner"><div class="brand"><div class="brand-icon">🤝</div><div><h1>Helper Dashboard</h1><p>Shifts, availability and pay</p></div></div><div class="live"><span class="dot"></span>Current</div></div></header>
+<header class="top"><div class="shell top-inner"><div class="brand"><div class="brand-icon"><img src="/icons/gqs-icon-192.png" alt="Gary’s Quick Delivery Service logo"/></div><div><h1>Helper Dashboard</h1><p>Shifts, availability and pay</p></div></div><div class="live" id="connection-status"><span class="dot"></span>Live data</div></div></header>
 <main class="shell">
 <section aria-labelledby="overview-tab" class="view active" id="overview">
 <div class="section-title">Next helper shift</div>
 <article class="card"><div class="card-pad">
-<div class="eyebrow"><span class="tag" id="next-status">Confirmation pending</span><span aria-label="Wednesday" id="next-day">Wed 16 Sep</span></div>
-<h2 id="next-location-time">Exmouth · 5–9pm</h2><p class="sub" id="next-deadline">Please respond by 4pm. Final confirmation is sent at 4:30pm.</p>
-<div class="facts"><div class="fact"><b id="next-gross">£60</b><span>Target gross</span></div><div class="fact"><b id="next-trips">12</b><span>Target trips</span></div><div class="fact"><b id="next-pay">£25</b><span>Est. helper pay</span></div><div class="fact"><b id="next-hours">4 hrs</b><span>Planned time</span></div></div>
-<div class="status" id="next-quest">Quest: not currently confirmed</div>
+<div class="eyebrow"><span class="tag" id="next-status">Loading live data</span><span aria-label="Wednesday" id="next-day">—</span></div>
+<h2 id="next-location-time">Loading Work Planner…</h2><p class="sub" id="next-deadline">Shift details are read from the live Work Planner.</p>
+<div class="facts"><div class="fact"><b id="next-gross">—</b><span>Target gross</span></div><div class="fact"><b id="next-trips">—</b><span>Target trips</span></div><div class="fact"><b id="next-pay">—</b><span>Est. helper pay</span></div><div class="fact"><b id="next-hours">—</b><span>Planned time</span></div></div>
+<div class="status" id="next-quest">Quest status will appear when live data loads.</div>
 
 </div></article><div class="section-title">Work controls</div><article class="card"><div class="card-pad"><a class="link-card control-link" href="https://app.notion.com/p/1735a933ee5045bc91cefffb6e4f49a1" rel="noopener" style="width:100%" target="_blank"><span class="ico">✅</span><div><b>Shift availability</b><small>Submit or update your availability</small></div><span class="chev">›</span></a></div></article>
 <div class="section-title">Current-week progress</div>
-<article class="card"><div class="media-wrap"><img alt="Current-week helper progress for 14 to 20 September 2026" class="media" src="/api/dashboard-image?index=0"/></div><div class="caption" id="week-caption">Tuesday is complete. Wednesday, Friday and Sunday remain in the current helper forecast.</div></article>
+<article class="card"><div class="live-graphic week-graphic"><div class="graphic-kicker">MONDAY–SUNDAY · LIVE FROM EARNINGS LOG</div><h3 id="week-dates">Current week</h3><div class="graphic-stats"><div><b id="week-shifts">—</b><span>Worked helper shifts</span></div><div><b id="week-hours">—</b><span>Helper time</span></div><div><b id="week-earned">—</b><span>Earned</span></div><div><b id="week-paid">—</b><span>Paid this week</span></div><div><b id="week-outstanding">—</b><span>Outstanding on these shifts</span></div></div><p class="graphic-footer" id="week-caption">Waiting for live weekly data…</p></div></article>
 </section>
 <section aria-labelledby="shifts-tab" class="view" id="shifts">
-<div class="section-title">Wednesday 16 September</div>
-<article class="card"><div class="media-wrap"><img alt="Wednesday 16 September Exmouth helper shift, 5pm to 9pm, £60 gross and 12-trip target" class="media" src="/api/dashboard-image?index=1"/></div><div class="caption">Approved shift card · Exmouth · 5–9pm · £60 target gross · 12 trips · estimated helper pay £25.</div></article>
-<div class="section-title">Trend &amp; demand</div>
-<article class="card"><div class="media-wrap" id="trend-media"><img alt="Current trend and demand graphic" class="media" id="trend-image" style="display:none"/></div><div class="card-pad"><p class="sub" id="trend-summary">No new trend/demand graphic has been recorded for the current shift.</p><p class="sub" id="trend-updated" style="margin-top:8px"></p></div></article>
+<div class="section-title">Live shift graphic</div>
+<article class="card"><div class="live-graphic shift-graphic"><div class="graphic-kicker" id="graphic-shift-status">NEXT CONFIRMED HELPER SHIFT</div><h3 id="graphic-shift-day">Waiting for Work Planner…</h3><p class="graphic-location" id="graphic-shift-location">—</p><div class="graphic-stats"><div><b id="graphic-shift-gross">—</b><span>Target gross</span></div><div><b id="graphic-shift-trips">—</b><span>Trip target</span></div><div><b id="graphic-shift-pay">—</b><span>Est. helper pay</span></div><div><b id="graphic-shift-hours">—</b><span>Planned time</span></div></div><p class="graphic-footer" id="graphic-shift-quest">Quest status will appear here.</p></div></article>
+<div class="section-title">Upcoming confirmed helper shifts</div>
+<article class="card"><div class="card-pad"><ul class="list" id="upcoming-shifts-list"><li><span class="ico">📅</span><div><b>Loading Work Planner</b><small>Confirmed helper shifts will appear here.</small></div></li></ul></div></article>
 <div class="section-title">Recent completed shift</div>
-<article class="card"><div class="card-pad"><div class="eyebrow"><span class="tag green">Completed</span><span id="recent-day">Tue 15 Sep</span></div><h2 id="recent-location-time" style="font-size:20px">Exmouth · 5:00–8:38pm</h2><div class="facts"><div class="fact"><b id="recent-gross">£48.80</b><span>Actual gross</span></div><div class="fact"><b id="recent-trips">10</b><span>Trips</span></div><div class="fact"><b id="recent-time">3h 38m</b><span>Helper time</span></div><div class="fact"><b id="recent-pay">£17.30</b><span>Helper pay</span></div></div></div></article>
+<article class="card"><div class="card-pad"><div class="eyebrow"><span class="tag green">Completed</span><span id="recent-day">—</span></div><h2 id="recent-location-time" style="font-size:20px">—</h2><div class="facts"><div class="fact"><b id="recent-gross">—</b><span>Actual gross</span></div><div class="fact"><b id="recent-trips">—</b><span>Trips</span></div><div class="fact"><b id="recent-time">—</b><span>Helper time</span></div><div class="fact"><b id="recent-pay">—</b><span>Helper pay</span></div><div class="fact"><b id="recent-boost">—</b><span>Trip boost</span></div></div></div></article>
 </section>
 <section aria-labelledby="pay-tab" class="view" id="pay">
 <div class="section-title">Current pay</div>
-<article class="card"><div class="card-pad"><div class="amount-row"><div><p class="sub" style="margin-bottom:8px">Currently owed</p><div class="amount" id="owed-amount">£17.30</div></div><span class="tag">Outstanding</span></div><p class="sub" id="owed-detail" style="margin-top:13px">From the completed helper shift on Tuesday 15 September, 5:00–8:38pm.</p></div></article>
+<article class="card"><div class="card-pad"><div class="amount-row"><div><p class="sub" style="margin-bottom:8px">Currently owed</p><div class="amount" id="owed-amount">—</div></div><span class="tag">Outstanding</span></div><p class="sub" id="owed-detail" style="margin-top:13px">Live outstanding balance from the Notion Earnings Log.</p></div></article>
 <div class="section-title">Latest payment</div>
-<article class="card"><div class="card-pad"><div class="amount-row"><div><b id="latest-payment" style="font-size:20px">£47.49</b><p class="sub" id="payment-reference">Reference 40 · 13 September</p></div><span class="paid">Paid</span></div><ul class="list" id="payment-breakdown" style="margin-top:12px"><li><span class="ico">✓</span><div><b>Saturday 12 September</b><small>6:04–8:36pm · £18.09</small></div></li><li><span class="ico">✓</span><div><b>Sunday 13 September</b><small>5:02–8:50pm · £29.40</small></div></li></ul></div></article>
+<article class="card"><div class="card-pad"><div class="amount-row"><div><b id="latest-payment" style="font-size:20px">—</b><p class="sub" id="payment-reference">No payment loaded</p></div><span class="paid" id="payment-status">Paid</span></div><ul class="list" id="payment-breakdown" style="margin-top:12px"></ul></div></article>
 <article class="card"><a class="link-card card-pad" href="https://www.notion.so/aed02957bc3b43e48d4d5194b86092b9" rel="noopener" target="_blank"><span class="ico">🤝</span><div><b>Helper Day Pay Agreement</b><small>Open the current working agreement</small></div><span class="chev">›</span></a></article>
 </section>
 
@@ -62,7 +85,7 @@
 <div class="section-title">Tools and support</div>
 <article class="card"><div class="card-pad"><ul class="list"><li><a class="link-card" href="https://deliverycounter.netlify.app/" rel="noopener" style="width:100%" target="_blank"><span class="ico">🔢</span><div><b>Delivery Counter</b><small>Open the live shift estimator</small></div><span class="chev">›</span></a></li><li><button class="link-card" data-go="ask-ai" style="width:100%;border:0;background:transparent;padding:0;text-align:left;cursor:pointer" type="button"><span class="ico">💬</span><div><b>Ask AI a question</b><small>Open inside this dashboard</small></div><span class="chev">›</span></button></li></ul></div></article>
 <div class="section-title">Browser guidance</div><div class="notice"><b>Android:</b> Firefox currently gives the best full-screen fit. Chrome’s address bar may cause slight vertical scrolling.</div>
-<p class="footer-note">Helper Dashboard · AI build v6 · Updated 16 September 2026</p>
+<p class="footer-note">Helper Dashboard · Live Notion data</p>
 </section>
 
 <section aria-labelledby="ask-ai-heading" class="view" id="ask-ai">
@@ -104,22 +127,46 @@
     document.querySelectorAll('.suggestion').forEach(button=>button.addEventListener('click',()=>askAI(button.textContent)));
     
     async function loadDashboardData(){
+      const money=v=>v===null||v===undefined||v===''?'—':'£'+Number(v||0).toFixed(2).replace(/\.00$/,'');
+      const set=(id,v)=>{const e=document.getElementById(id);if(e&&v!==undefined)e.textContent=(v===null||v==='')?'—':v};
+      const status=document.getElementById('connection-status');
+      const hoursText=v=>v===null||v===undefined?'—':`${Math.floor(Number(v))}h${Math.round((Number(v)%1)*60)?' '+Math.round((Number(v)%1)*60)+'m':''}`;
       try{
         const response=await fetch('/api/dashboard-data',{cache:'no-store'});
-        if(!response.ok) throw new Error('Data unavailable');
-        const d=await response.json(); const n=d.nextShift||{}; const r=d.recentShift||{}; const pay=d.latestPayment||{}; const td=d.trendDemand||{};
-        const money=v=>'£'+Number(v||0).toFixed(2).replace(/\.00$/,'');
-        const set=(id,v)=>{const e=document.getElementById(id);if(e&&v!==undefined)e.textContent=v};
-        set('next-status',n.status);set('next-day',n.day);set('next-location-time',`${n.location} · ${n.start}–${n.end}`);set('next-deadline',`Please respond by ${n.responseDeadline}. Final confirmation is sent at ${n.finalConfirmation}.`);
-        set('next-gross',money(n.targetGross));set('next-trips',n.targetTrips);set('next-pay',money(n.estimatedHelperPay));set('next-hours',`${n.plannedHours} hrs`);set('next-quest',`Quest: ${String(n.quest||'Not currently confirmed').toLowerCase()}`);
-        set('recent-day',r.day);set('recent-location-time',`${r.location} · ${r.start}–${r.end}`);set('recent-gross',money(r.gross));set('recent-trips',r.trips);set('recent-time',r.helperTime);set('recent-pay',money(r.helperPay));
-        set('owed-amount',money(d.currentlyOwed ?? r.helperPay));set('owed-detail',`Synced from the Notion earnings log${d.updatedAt?' · '+new Date(d.updatedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):''}.`);set('latest-payment',money(pay.amount));set('payment-reference',`Reference ${pay.reference||''} · ${pay.date||''}`);const breakdown=document.getElementById('payment-breakdown');if(breakdown&&Array.isArray(pay.breakdown)){breakdown.innerHTML=pay.breakdown.map(x=>`<li><span class="ico">✓</span><div><b>${x.label||''}</b><small>${x.detail||''}</small></div></li>`).join('')};set('week-caption',d.currentWeek?.caption);
-        set('trend-summary',td.summary||'No new trend/demand graphic has been recorded for the current shift.');
-        if(td.updatedAt) set('trend-updated',`Updated ${new Date(td.updatedAt).toLocaleString('en-GB')}`);
-        {const img=document.getElementById('trend-image');img.src='/api/dashboard-image?index=2&t='+Date.now();img.onload=()=>{document.getElementById('trend-media').style.display='block';};}
-      }catch(e){console.warn('Dashboard data load skipped',e)}
+        if(!response.ok) throw new Error('Live Notion data unavailable');
+        const d=await response.json();
+        if(d.dataUnavailable){
+          if(status){status.classList.add('sync-error');status.innerHTML='<span class="dot"></span>Sync unavailable'}
+          set('next-status','Live data unavailable');set('next-day','Unable to load shift data');set('next-location-time','Check the Notion connection');
+          set('next-deadline','Figures are not being shown as current until the connection is restored.');
+          set('next-gross',null);set('next-trips',null);set('next-pay',null);set('next-hours',null);set('next-quest','Quest status unavailable');
+          set('owed-amount',null);set('owed-detail','Live Notion connection unavailable — no balance shown.');
+          set('latest-payment',null);set('payment-reference','Payment data unavailable');set('payment-status','Unavailable');
+          set('week-caption','Live weekly data unavailable');set('week-shifts','—');set('week-hours','—');set('week-earned','—');set('week-paid','—');set('week-outstanding','—');
+          set('graphic-shift-status','LIVE DATA UNAVAILABLE');set('graphic-shift-day','Unable to load Work Planner');set('graphic-shift-location','No shift details shown until sync is restored.');
+          set('graphic-shift-gross','—');set('graphic-shift-trips','—');set('graphic-shift-pay','—');set('graphic-shift-hours','—');set('graphic-shift-quest','Quest status unavailable.');
+          const list=document.getElementById('upcoming-shifts-list');if(list)list.innerHTML='<li><span class="ico">!</span><div><b>Live data unavailable</b><small>Upcoming shifts will appear when the Notion connection is restored.</small></div></li>';
+          return;
+        }
+        if(status){const partial=!!(d.shiftSyncError||d.outstandingSyncError);status.classList.toggle('sync-error',partial);status.innerHTML=`<span class="dot"></span>${partial?'Partial sync':'Live data'}`}
+        const n=d.nextShift||{},r=d.recentShift||{},pay=d.latestPayment||{},w=d.currentWeek||{};
+        const nextLocation=[n.location,(n.start||n.end)?`${n.start||''}${n.start&&n.end?'–':''}${n.end||''}`:''].filter(Boolean).join(' · ');
+        set('next-status',n.status||'No upcoming confirmed shift');set('next-day',n.day||'No upcoming helper shift');set('next-location-time',nextLocation||'No confirmed helper shift');
+        set('next-deadline',n.responseDeadline?`Please respond by ${n.responseDeadline}${n.finalConfirmation?`. Final confirmation is sent at ${n.finalConfirmation}.`:'.'}`:'Only confirmed or live helper shifts are shown here.');
+        set('next-gross',money(n.targetGross));set('next-trips',n.targetTrips);set('next-pay',money(n.estimatedHelperPay));set('next-hours',n.plannedHours==null?'—':`${n.plannedHours} hrs`);set('next-quest',`Quest: ${String(n.quest||'Not currently confirmed').toLowerCase()}`);
+        set('graphic-shift-status',(n.status||'NEXT CONFIRMED HELPER SHIFT').toUpperCase());set('graphic-shift-day',n.day||'No upcoming helper shift');set('graphic-shift-location',nextLocation||'No confirmed helper shift');
+        set('graphic-shift-gross',money(n.targetGross));set('graphic-shift-trips',n.targetTrips);set('graphic-shift-pay',money(n.estimatedHelperPay));set('graphic-shift-hours',n.plannedHours==null?'—':`${n.plannedHours} hrs`);set('graphic-shift-quest',`Quest: ${String(n.quest||'Not currently confirmed').toLowerCase()}`);
+        set('recent-day',r.day||'No completed helper shift recorded');set('recent-location-time',[r.location,(r.start||r.end)?`${r.start||''}${r.start&&r.end?'–':''}${r.end||''}`:''].filter(Boolean).join(' · ')||'—');set('recent-gross',money(r.gross));set('recent-trips',r.trips);set('recent-time',r.helperTime||'—');set('recent-pay',money(r.helperPay));set('recent-boost',money(r.helperBoost));
+        set('owed-amount',d.outstandingSyncError?null:money(d.currentlyOwed));set('owed-detail',d.outstandingSyncError?'Current helper outstanding rollup could not be read — balance withheld.':`Source: Current helper outstanding rollup${d.updatedAt?' · Last synced '+new Date(d.updatedAt).toLocaleString('en-GB',{dateStyle:'medium',timeStyle:'short'}):''}.`);
+        set('latest-payment',money(pay.amount));set('payment-reference',pay.amount==null?'No payment recorded':`Reference ${pay.reference||''} · ${pay.date||''}`);set('payment-status',pay.amount==null?'No record':'Paid');
+        const breakdown=document.getElementById('payment-breakdown');if(breakdown){breakdown.innerHTML='';if(Array.isArray(pay.breakdown)&&pay.breakdown.length){pay.breakdown.forEach(x=>{const li=document.createElement('li'),ico=document.createElement('span'),body=document.createElement('div'),b=document.createElement('b'),small=document.createElement('small');ico.className='ico';ico.textContent='✓';b.textContent=x.label||'Payment entry';small.textContent=x.detail||'';body.append(b,small);li.append(ico,body);breakdown.append(li)})}else{const li=document.createElement('li');li.textContent='No payment breakdown available.';breakdown.append(li)}}
+        set('week-dates',w.weekStart&&w.weekEnd?`${new Date(w.weekStart+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'})} – ${new Date(w.weekEnd+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}`:'Current week');
+        set('week-shifts',w.shiftCount??'—');set('week-hours',hoursText(w.hours));set('week-earned',money(w.earned));set('week-paid',money(w.paid));set('week-outstanding',money(w.outstanding));set('week-caption',w.caption||'Weekly totals calculated from completed helper earnings records.');
+        const list=document.getElementById('upcoming-shifts-list');if(list){list.innerHTML='';const shifts=Array.isArray(d.upcomingShifts)?d.upcomingShifts:[];if(!shifts.length){const li=document.createElement('li'),ico=document.createElement('span'),body=document.createElement('div'),b=document.createElement('b'),small=document.createElement('small');ico.className='ico';ico.textContent='✓';b.textContent='No upcoming confirmed helper shifts';small.textContent='New confirmed shifts will appear here automatically.';body.append(b,small);li.append(ico,body);list.append(li)}else{shifts.forEach(s=>{const li=document.createElement('li'),ico=document.createElement('span'),body=document.createElement('div'),b=document.createElement('b'),small=document.createElement('small');ico.className='ico';ico.textContent=s.quest?'🏆':'📅';b.textContent=`${s.day||s.date} · ${s.location||s.title||'Helper shift'}`;small.textContent=[s.window,s.status,`Target ${money(s.targetGross)}`,`${s.targetTrips??'—'} trips`].filter(Boolean).join(' · ');body.append(b,small);li.append(ico,body);list.append(li)})}}
+      }catch(e){console.warn('Dashboard live-data load failed',e);if(status){status.classList.add('sync-error');status.innerHTML='<span class="dot"></span>Sync unavailable'}set('owed-amount',null);set('owed-detail','Live Notion connection unavailable — no balance shown.');set('week-caption','Live weekly data unavailable');}
     }
     loadDashboardData();
+    window.setInterval(loadDashboardData, 60000);
 
     if('serviceWorker' in navigator){window.addEventListener('load',async()=>{try{const regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(r=>r.unregister()));if('caches' in window){const keys=await caches.keys();await Promise.all(keys.map(k=>caches.delete(k)));}}catch(e){console.warn('Cache cleanup skipped',e);}});}
   </script>
