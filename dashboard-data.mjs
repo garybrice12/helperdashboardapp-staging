@@ -585,7 +585,9 @@ export function buildDashboardData({
   syncTestActive = false,
   now = new Date()
 } = {}) {
-  if (earningsError) return unavailablePayload(now);
+  // Earnings, shifts and helper-pay summary are independent sources. A failed
+  // earnings query must not erase valid shift/summary data or silently look like
+  // a successful empty sync.
   const rows = (earningsPages || []).map(mapEarningsPage);
   const today = ukISODate(now);
   const recentShift = makeRecentShift(rows);
@@ -617,7 +619,13 @@ export function buildDashboardData({
     })),
     upcomingShifts: shiftError ? [] : makeLiveUpcomingShifts(shiftPages, today),
     shiftSyncError: Boolean(shiftError),
-    earningsSyncError: false,
+    earningsSyncError: Boolean(earningsError),
+    syncError: Boolean(earningsError || shiftError || outstandingError),
+    syncErrorMessage: earningsError
+      ? 'Earnings Log could not be read from Notion. Check that the integration used by NOTION_TOKEN has access to the Earnings log data source.'
+      : (shiftError
+        ? 'Work Planner could not be read from Notion. Check the integration access to the Work Planner data source.'
+        : (outstandingError ? 'Helper Pay Summary could not be read from Notion.' : '')),
     syncTestActive: Boolean(syncTestActive),
     tripBoost: recentShift?.tripBoost ?? null,
     trendDemand: TREND_DEMAND,

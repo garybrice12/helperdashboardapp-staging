@@ -9,8 +9,8 @@
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
 <meta content="Helper shifts, availability and pay progress in one place." name="description"/>
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/gqs-icon-192.png"/>
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/gqs-icon-192.png?v=4"/>
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=4"/>
 <link rel="manifest" href="/manifest.webmanifest"/>
 <title>Helper Dashboard</title>
 <style>
@@ -30,6 +30,9 @@
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
     .ai-shell{display:grid;gap:12px}.ai-header{display:flex;align-items:flex-start;gap:12px}.ai-back{flex:0 0 44px;height:44px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font-size:22px;cursor:pointer}.ai-back:hover{background:var(--soft)}.ai-intro h2{font-size:22px;margin:0 0 5px}.ai-thread{min-height:230px;max-height:52vh;overflow:auto;padding:4px 0;display:grid;gap:10px;align-content:start}.message{max-width:88%;padding:11px 13px;border-radius:12px;white-space:pre-wrap;overflow-wrap:anywhere}.message.assistant{justify-self:start;background:var(--soft);color:var(--text);border:1px solid #cce3f7}.message.user{justify-self:end;background:var(--blue);color:#fff}.message.error{justify-self:start;background:var(--orange-soft);color:var(--text);border:1px solid #efc49f}.suggestions{display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;scrollbar-width:thin}.suggestion{flex:0 0 auto;min-height:44px;padding:9px 12px;border:1px solid #acd1f3;border-radius:10px;background:var(--surface);color:var(--blue);font-weight:750;cursor:pointer}.ai-form{display:grid;grid-template-columns:1fr auto;gap:8px}.ai-input{min-width:0;min-height:48px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);padding:11px 12px;font:inherit}.ai-input:focus{outline:3px solid #8ec3f1;outline-offset:1px}.ai-send{min-width:74px;min-height:48px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:800;padding:0 16px;cursor:pointer}.ai-send:disabled{opacity:.6;cursor:wait}.ai-note{font-size:12px;color:var(--muted);margin:0}.ai-back:focus-visible,.suggestion:focus-visible,.ai-send:focus-visible{outline:3px solid #8ec3f1;outline-offset:2px}
+
+.staff-card{display:none;align-items:center;gap:16px;padding:16px}.staff-card.visible{display:flex}.staff-photo{width:88px;height:88px;flex:0 0 88px;border-radius:12px;object-fit:cover;background:#e8edf2}.staff-meta{min-width:0}.staff-meta h2{font-size:20px;margin-bottom:5px}.login-box{padding:16px}.login-row{display:flex;gap:8px}.login-row input{min-width:0;flex:1;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:16px}.form-label{display:block;font-weight:700;font-size:13px;margin:10px 0 5px}.feedback-form select,.feedback-form input,.feedback-form textarea{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;font:inherit;background:white}.feedback-form textarea{min-height:110px;resize:vertical}.form-status{font-size:13px;margin-top:10px}.help-links{display:grid;gap:9px}.help-links .btn{width:100%}
+@media(max-width:480px){.staff-photo{width:72px;height:72px;flex-basis:72px}.staff-card{gap:12px;padding:13px}}
 </style>
 
 <style>
@@ -53,9 +56,11 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="shell top-inner"><div class="brand"><div class="brand-icon"><img src="/icons/gqs-icon-192.png" alt="Gary’s Quick Delivery Service logo"/></div><div><h1>Helper Dashboard</h1><p>Shifts, availability and pay</p></div></div><div class="live" id="connection-status"><span class="dot"></span>Live data</div></div></header>
+<header class="top"><div class="shell top-inner"><div class="brand"><div class="brand-icon"><img src="/icons/gqs-icon-192.png?v=4" alt="Gary’s Quick Delivery Service logo"/></div><div><h1>Helper Dashboard</h1><p>Shifts, availability and pay</p></div></div><div class="live" id="connection-status"><span class="dot"></span>Live data</div></div></header>
 <main class="shell">
 <section aria-labelledby="overview-tab" class="view active" id="overview">
+<div class="section-title">Your staff profile</div>
+<article class="card"><div class="card-pad login-box" id="login-box"><p class="sub" style="margin-bottom:10px">Sign in with the PIN assigned to your staff profile.</p><form id="login-form"><label class="form-label" for="staff-pin">Staff PIN</label><div class="login-row"><input id="staff-pin" inputmode="numeric" autocomplete="current-password" minlength="4" maxlength="8" pattern="[0-9]{4,8}" placeholder="Enter PIN" required/><button class="btn" id="login-submit" type="submit">Sign in</button></div><p class="form-status" id="login-status" aria-live="polite"></p></form></div><div class="staff-card" id="staff-card"><img class="staff-photo" id="staff-photo" alt="Staff profile photo"/><div class="staff-meta"><div class="eyebrow"><span class="tag green" id="staff-status">Signed in</span><button type="button" class="btn secondary" id="logout-button" style="min-height:36px;padding:6px 10px">Sign out</button></div><h2 id="staff-name">Staff member</h2><p class="sub" id="staff-position">Team member</p><p class="sub" id="staff-work"></p></div></div></article>
 <div class="section-title">Next helper shift</div>
 <article class="card"><div class="card-pad">
 <div class="eyebrow"><span class="tag" id="next-status">Loading live data</span><span aria-label="Wednesday" id="next-day">—</span></div>
@@ -79,7 +84,9 @@
 </section>
 <section aria-labelledby="shifts-tab" class="view" id="shifts">
 <div class="section-title">Live shift graphic</div>
-<article class="card"><div class="media-wrap shift-image-wrap"><img id="live-shift-image" class="media live-shift-image" src="/api/dashboard-image?index=1&amp;v=2" alt="Current live helper shift graphic from Notion Graphic Control" loading="eager"/><p class="caption" id="live-shift-image-caption">Live graphic synced from Notion Graphic Control.</p></div></article>
+<article class="card"><div class="media-wrap shift-image-wrap"><img id="live-shift-image" class="media live-shift-image" src="/api/dashboard-image?v=3" alt="Current live helper shift graphic from Notion Graphic Control" loading="eager"/><p class="caption" id="live-shift-image-caption">Live graphic synced from Notion Graphic Control.</p></div></article>
+<div class="section-title">Your shift requests</div>
+<article class="card"><div class="card-pad"><p class="sub" id="my-requests-status">Sign in to view requests submitted under your staff profile.</p><ul class="list" id="my-requests-list" style="margin-top:10px"></ul></div></article>
 <div class="section-title">Recent completed shift</div>
 <article class="card"><div class="card-pad"><div class="eyebrow"><span class="tag green">Completed</span><span id="recent-day">—</span></div><h2 id="recent-location-time" style="font-size:20px">—</h2><div class="facts"><div class="fact"><b id="recent-gross">—</b><span>Actual gross</span></div><div class="fact"><b id="recent-trips">—</b><span>Trips</span></div><div class="fact"><b id="recent-time">—</b><span>Helper time</span></div><div class="fact"><b id="recent-pay">—</b><span>Helper pay</span></div><div class="fact"><b id="recent-boost">—</b><span>Trip boost</span></div></div></div></article>
 </section>
@@ -92,6 +99,8 @@
 <section aria-labelledby="tools-tab" class="view" id="more">
 <div class="section-title">Tools</div>
 <article class="card"><div class="card-pad"><ul class="list"><li><a class="link-card" href="https://deliverycounter.netlify.app/" rel="noopener" style="width:100%" target="_blank"><span class="ico">🔢</span><div><b>Delivery Counter</b><small>Open the live shift estimator</small></div><span class="chev">›</span></a></li><li><a class="link-card" href="https://app.notion.com/p/f4281bcbbf694edb8ac345d9c1fc44be?pvs=204" rel="noopener" style="width:100%" target="_blank"><span class="ico">⏱️</span><div><b>Restaurant Timer</b><small>Open the existing restaurant wait timer</small></div><span class="chev">›</span></a></li><li><button class="link-card" data-go="ask-ai" style="width:100%;border:0;background:transparent;padding:0;text-align:left;cursor:pointer" type="button"><span class="ico">💬</span><div><b>Ask AI a question</b><small>Open inside this dashboard</small></div><span class="chev">›</span></button></li></ul></div></article>
+<div class="section-title">Help &amp; Support</div><article class="card"><div class="card-pad help-links"><a class="btn" href="https://wa.me/447944954449?text=Hi%20Gary%2C%20I%20need%20help%20with%20the%20Helper%20Dashboard." target="_blank" rel="noopener">Chat with Gary on WhatsApp</a><p class="sub">Use WhatsApp for PIN changes, login trouble, shift questions or other issues.</p></div></article>
+<div class="section-title">Send feedback</div><article class="card"><div class="card-pad"><form class="feedback-form" id="feedback-form"><label class="form-label" for="feedback-name">Your name</label><input id="feedback-name" maxlength="80" required placeholder="Name"/><label class="form-label" for="feedback-type">Feedback type</label><select id="feedback-type" required><option>Suggestion</option><option>Problem</option><option>Compliment</option><option>Other</option></select><label class="form-label" for="feedback-area">App section</label><select id="feedback-area" required><option>Overview</option><option>Shifts</option><option>Pay</option><option>Ask AI</option><option>Help &amp; support</option><option>Other</option></select><label class="form-label" for="feedback-message">Suggestion or issue</label><textarea id="feedback-message" maxlength="3000" required placeholder="Tell Gary what happened or what you would like changed…"></textarea><button class="btn" type="submit" id="feedback-submit" style="margin-top:12px">Send feedback</button><p class="form-status" id="feedback-status" aria-live="polite"></p></form></div></article>
 <div class="section-title">Browser guidance</div><div class="notice"><b>Android:</b> Firefox currently gives the best full-screen fit. Chrome’s address bar may cause slight vertical scrolling.</div>
 <p class="footer-note">Helper Dashboard · Live Notion data</p>
 </section>
@@ -118,6 +127,15 @@
     function show(id){views.forEach(v=>v.classList.toggle('active',v.id===id));tabs.forEach(t=>t.classList.toggle('active',t.dataset.view===id));window.scrollTo({top:0,behavior:'smooth'});history.replaceState(null,'','#'+id)}
     tabs.forEach(t=>t.addEventListener('click',()=>show(t.dataset.view)));document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>show(b.dataset.go)));
     const initial=location.hash.slice(1);if(views.some(v=>v.id===initial))show(initial);
+    const loginForm=document.getElementById('login-form'),loginStatus=document.getElementById('login-status'),loginBox=document.getElementById('login-box'),staffCard=document.getElementById('staff-card');
+    function showStaff(staff){if(!staff){loginBox.style.display='block';staffCard.classList.remove('visible');return}loginBox.style.display='none';staffCard.classList.add('visible');document.getElementById('staff-name').textContent=staff.name||'Staff member';document.getElementById('staff-position').textContent=staff.position||'Team member';document.getElementById('staff-status').textContent=staff.status||'Signed in';document.getElementById('staff-work').textContent=staff.currentWork||'';const photo=document.getElementById('staff-photo');if(staff.photoUrl){photo.src=staff.photoUrl;photo.style.display='block'}else{photo.removeAttribute('src');photo.style.display='none'}}
+    async function loadMyRequests(){const status=document.getElementById('my-requests-status'),list=document.getElementById('my-requests-list');if(!status||!list)return;list.replaceChildren();try{const r=await fetch('/.netlify/functions/helper-requests',{cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Sign in to view your requests.');if(!d.requests?.length){status.textContent='No shift requests found under your staff profile name.';return}status.textContent='Showing only requests matching your staff profile name.';d.requests.forEach(item=>{const li=document.createElement('li'),ico=document.createElement('span'),body=document.createElement('div'),b=document.createElement('b'),small=document.createElement('small'),link=document.createElement('a');ico.className='ico';ico.textContent='📋';b.textContent=item.shift||item.date||'Shift request';small.textContent=[item.availability,item.status,item.submittedAt?new Date(item.submittedAt).toLocaleDateString('en-GB'):''].filter(Boolean).join(' · ')||'Status not recorded';body.append(b,small);li.append(ico,body);if(item.url){link.href=item.url;link.target='_blank';link.rel='noopener';link.className='chev';link.textContent='›';link.setAttribute('aria-label','Open request');li.append(link)}list.append(li)})}catch(e){status.textContent=e.message||'Could not load your requests.'}}
+    async function checkSession(){try{const r=await fetch('/.netlify/functions/helper-login?action=me',{cache:'no-store'});const d=await r.json();if(r.ok&&d.authenticated){showStaff(d.staff);loadMyRequests()}else{showStaff(null);const s=document.getElementById('my-requests-status');if(s)s.textContent='Sign in to view requests submitted under your staff profile.'}}catch(e){console.warn('Staff session check unavailable',e)}}
+    loginForm.addEventListener('submit',async e=>{e.preventDefault();const button=document.getElementById('login-submit');button.disabled=true;loginStatus.textContent='Checking PIN…';try{const r=await fetch('/.netlify/functions/helper-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pin:document.getElementById('staff-pin').value.trim()})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Could not sign in.');showStaff(d.staff);loadMyRequests();loginStatus.textContent='Signed in successfully.';document.getElementById('staff-pin').value=''}catch(err){loginStatus.textContent=err.message||'Sign-in failed.'}finally{button.disabled=false}});
+    document.getElementById('logout-button').addEventListener('click',async()=>{try{await fetch('/.netlify/functions/helper-login?action=logout',{method:'POST'})}catch{}showStaff(null);const rs=document.getElementById('my-requests-status');if(rs)rs.textContent='Sign in to view requests submitted under your staff profile.';document.getElementById('my-requests-list').replaceChildren();loginStatus.textContent='Signed out.'});
+    const feedbackForm=document.getElementById('feedback-form');feedbackForm.addEventListener('submit',async e=>{e.preventDefault();const button=document.getElementById('feedback-submit'),status=document.getElementById('feedback-status');button.disabled=true;status.textContent='Sending…';try{const r=await fetch('/.netlify/functions/submit-feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:document.getElementById('feedback-name').value.trim(),type:document.getElementById('feedback-type').value,area:document.getElementById('feedback-area').value,feedback:document.getElementById('feedback-message').value.trim()})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Feedback could not be saved.');status.textContent='Feedback saved for Gary to review.';document.getElementById('feedback-message').value=''}catch(err){status.textContent=err.message||'Could not send feedback.'}finally{button.disabled=false}});
+    checkSession();
+
 
     const aiForm=document.getElementById('ai-form'),aiInput=document.getElementById('ai-input'),aiThread=document.getElementById('ai-thread'),aiSend=document.getElementById('ai-send');
     function addMessage(text,type='assistant'){const el=document.createElement('div');el.className='message '+type;el.textContent=text;aiThread.appendChild(el);aiThread.scrollTop=aiThread.scrollHeight;return el}
@@ -153,7 +171,7 @@
           set('week-caption','Live weekly data unavailable');set('week-shifts','—');set('week-hours','—');set('week-earned','—');set('week-paid','—');set('week-outstanding','—');
           return;
         }
-        if(status){status.classList.remove('sync-error');status.innerHTML='<span class="dot"></span>Live data'}
+        if(status){if(d.syncError){status.classList.add('sync-error');status.innerHTML='<span class="dot"></span>Sync issue'}else{status.classList.remove('sync-error');status.innerHTML='<span class="dot"></span>Live data'}}
         const n=d.nextShift||{},r=d.recentShift||{},pay=d.latestPayment||{},w=d.currentWeek||{};
         const nextLocation=[n.location,(n.start||n.end)?`${n.start||''}${n.start&&n.end?'–':''}${n.end||''}`:''].filter(Boolean).join(' · ');
         set('next-status',n.status||'No upcoming confirmed shift');set('next-day',n.day||'No upcoming helper shift');set('next-location-time',nextLocation||'No confirmed helper shift');
@@ -166,12 +184,14 @@
         // Keep one entry per Notion page. The Notion query is paginated, and
         // page IDs prevent a repeated record from inflating weekly totals.
         const rawWeeklyRows=Array.isArray(d.weeklyRows)?d.weeklyRows:[];
-        const seenWeeklyIds=new Set();
+        const seenWeeklyKeys=new Set();
         const weeklyRows=rawWeeklyRows.filter(row=>{
-          if(!row||!row.date)return false;
-          if(!row.id)return true;
-          if(seenWeeklyIds.has(row.id))return false;
-          seenWeeklyIds.add(row.id);return true;
+          if(!row||typeof row.date!=='string'||!/^\d{4}-\d{2}-\d{2}/.test(row.date))return false;
+          // Prefer the stable Notion page ID. If an API payload omits it, use a
+          // row fingerprint instead of treating every missing ID as the same row.
+          const key=row.id?`id:${row.id}`:`row:${[row.date,row.shiftTime,row.location,row.gross,row.trips,row.miles,row.helperPaid].join('|')}`;
+          if(seenWeeklyKeys.has(key))return false;
+          seenWeeklyKeys.add(key);return true;
         });
         const picker=document.getElementById('week-picker');
         const isoDate=date=>date.toISOString().slice(0,10);
@@ -180,7 +200,7 @@
         const currentStart=w.weekStart||mondayOf(new Date().toISOString().slice(0,10));
         // Build the selector from every dated helper earnings record returned
         // by the paginated API, not just records in the current week.
-        const weekStarts=[...new Set([currentStart,...weeklyRows.map(row=>mondayOf(row.date))])].sort().reverse();
+        const weekStarts=[...new Set([currentStart,...weeklyRows.filter(row=>row.date).map(row=>mondayOf(row.date))])].sort().reverse();
         if(picker){picker.innerHTML='';weekStarts.forEach(start=>{const end=weekEndOf(start),opt=document.createElement('option');opt.value=start;opt.textContent=`${new Date(start+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})} – ${new Date(end+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}${start===currentStart?' · Current week':''}`;picker.append(opt)});if(!picker.dataset.bound){picker.addEventListener('change',()=>renderSelectedWeek(picker.value));picker.dataset.bound='1';}}
         function renderSelectedWeek(start){
           const end=weekEndOf(start),rows=weeklyRows.filter(row=>row.date>=start&&row.date<=end&&((Number(row.gross)||0)>0||(Number(row.trips)||0)>0||(Number(row.helperHours)||0)>0));

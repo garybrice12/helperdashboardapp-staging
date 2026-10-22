@@ -40,3 +40,20 @@ Included in this build:
 - Removed the repeated weekly totals sentence from the graphic footer; the stat tiles remain the single display of weekly totals, and the footer now describes the data source or reports an empty week.
 - Local validation: `node --check netlify/functions/dashboard-data.mjs` passed; inline scripts in both HTML entry files parsed successfully.
 - Limitation: built from the recovered ZIP, not a fresh checkout of GitHub. Live Notion data and Netlify deployment have not been verified in this session.
+\n\n## 2026-10-23 — Earnings sync repair\n- A failure to read Earnings Log no longer causes the entire dashboard API to return the generic unavailable payload.\n- The API now marks `earningsSyncError` and returns a specific, safe message directing the operator to verify that the Notion integration behind `NOTION_TOKEN` has been granted access to the Earnings log data source.\n- Existing weekly rows still come only from live Notion data; no sample or fabricated earnings are inserted.\n
+
+## 2026-10-23 — Graphic Control image source fix
+- The current-shift graphic is now selected by the exact `Shift graphic` toggle in Notion Graphic Control, rather than selecting the second image on the page (which was the demand-chart reference).
+- Header icon, browser icon, and shift graphic now use the Graphic Control image endpoint.
+- The dashboard header displays `Sync issue` when the API reports a partial Notion sync failure.
+
+
+## Main logo correction — 23 October 2026
+- Restored the dedicated Gary’s Quick Delivery Service logo assets for the header, browser icon, and phone shortcut.
+- Kept `/api/dashboard-image` exclusively for the current shift graphic, so the shift graphic can no longer replace the main logo.
+- Added cache-busting query versions to the logo references.
+
+Weekly selector regression correction (23 Oct 2026):
+- Weekly rows are filtered to valid ISO dates before week options are built.
+- Duplicate prevention uses Notion page IDs when available and a stable row fingerprint when IDs are missing, avoiding accidental collapse of multiple records with missing IDs.
+- Historical week options remain derived from all dated earnings rows returned by the data endpoint.

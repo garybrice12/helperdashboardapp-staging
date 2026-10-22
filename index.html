@@ -9,8 +9,8 @@
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
 <meta content="Helper shifts, availability and pay progress in one place." name="description"/>
-<link rel="icon" type="image/png" sizes="192x192" href="/icons/gqs-icon-192.png"/>
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/gqs-icon-192.png?v=4"/>
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png?v=4"/>
 <link rel="manifest" href="/manifest.webmanifest"/>
 <title>Helper Dashboard</title>
 <style>
@@ -56,7 +56,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="shell top-inner"><div class="brand"><div class="brand-icon"><img src="/icons/gqs-icon-192.png" alt="Gary’s Quick Delivery Service logo"/></div><div><h1>Helper Dashboard</h1><p>Shifts, availability and pay</p></div></div><div class="live" id="connection-status"><span class="dot"></span>Live data</div></div></header>
+<header class="top"><div class="shell top-inner"><div class="brand"><div class="brand-icon"><img src="/icons/gqs-icon-192.png?v=4" alt="Gary’s Quick Delivery Service logo"/></div><div><h1>Helper Dashboard</h1><p>Shifts, availability and pay</p></div></div><div class="live" id="connection-status"><span class="dot"></span>Live data</div></div></header>
 <main class="shell">
 <section aria-labelledby="overview-tab" class="view active" id="overview">
 <div class="section-title">Your staff profile</div>
@@ -84,7 +84,7 @@
 </section>
 <section aria-labelledby="shifts-tab" class="view" id="shifts">
 <div class="section-title">Live shift graphic</div>
-<article class="card"><div class="media-wrap shift-image-wrap"><img id="live-shift-image" class="media live-shift-image" src="/api/dashboard-image?index=1&amp;v=2" alt="Current live helper shift graphic from Notion Graphic Control" loading="eager"/><p class="caption" id="live-shift-image-caption">Live graphic synced from Notion Graphic Control.</p></div></article>
+<article class="card"><div class="media-wrap shift-image-wrap"><img id="live-shift-image" class="media live-shift-image" src="/api/dashboard-image?v=3" alt="Current live helper shift graphic from Notion Graphic Control" loading="eager"/><p class="caption" id="live-shift-image-caption">Live graphic synced from Notion Graphic Control.</p></div></article>
 <div class="section-title">Your shift requests</div>
 <article class="card"><div class="card-pad"><p class="sub" id="my-requests-status">Sign in to view requests submitted under your staff profile.</p><ul class="list" id="my-requests-list" style="margin-top:10px"></ul></div></article>
 <div class="section-title">Recent completed shift</div>
@@ -171,7 +171,7 @@
           set('week-caption','Live weekly data unavailable');set('week-shifts','—');set('week-hours','—');set('week-earned','—');set('week-paid','—');set('week-outstanding','—');
           return;
         }
-        if(status){status.classList.remove('sync-error');status.innerHTML='<span class="dot"></span>Live data'}
+        if(status){if(d.syncError){status.classList.add('sync-error');status.innerHTML='<span class="dot"></span>Sync issue'}else{status.classList.remove('sync-error');status.innerHTML='<span class="dot"></span>Live data'}}
         const n=d.nextShift||{},r=d.recentShift||{},pay=d.latestPayment||{},w=d.currentWeek||{};
         const nextLocation=[n.location,(n.start||n.end)?`${n.start||''}${n.start&&n.end?'–':''}${n.end||''}`:''].filter(Boolean).join(' · ');
         set('next-status',n.status||'No upcoming confirmed shift');set('next-day',n.day||'No upcoming helper shift');set('next-location-time',nextLocation||'No confirmed helper shift');
@@ -184,12 +184,14 @@
         // Keep one entry per Notion page. The Notion query is paginated, and
         // page IDs prevent a repeated record from inflating weekly totals.
         const rawWeeklyRows=Array.isArray(d.weeklyRows)?d.weeklyRows:[];
-        const seenWeeklyIds=new Set();
+        const seenWeeklyKeys=new Set();
         const weeklyRows=rawWeeklyRows.filter(row=>{
-          if(!row||!row.date)return false;
-          if(!row.id)return true;
-          if(seenWeeklyIds.has(row.id))return false;
-          seenWeeklyIds.add(row.id);return true;
+          if(!row||typeof row.date!=='string'||!/^\d{4}-\d{2}-\d{2}/.test(row.date))return false;
+          // Prefer the stable Notion page ID. If an API payload omits it, use a
+          // row fingerprint instead of treating every missing ID as the same row.
+          const key=row.id?`id:${row.id}`:`row:${[row.date,row.shiftTime,row.location,row.gross,row.trips,row.miles,row.helperPaid].join('|')}`;
+          if(seenWeeklyKeys.has(key))return false;
+          seenWeeklyKeys.add(key);return true;
         });
         const picker=document.getElementById('week-picker');
         const isoDate=date=>date.toISOString().slice(0,10);
@@ -198,7 +200,7 @@
         const currentStart=w.weekStart||mondayOf(new Date().toISOString().slice(0,10));
         // Build the selector from every dated helper earnings record returned
         // by the paginated API, not just records in the current week.
-        const weekStarts=[...new Set([currentStart,...weeklyRows.map(row=>mondayOf(row.date))])].sort().reverse();
+        const weekStarts=[...new Set([currentStart,...weeklyRows.filter(row=>row.date).map(row=>mondayOf(row.date))])].sort().reverse();
         if(picker){picker.innerHTML='';weekStarts.forEach(start=>{const end=weekEndOf(start),opt=document.createElement('option');opt.value=start;opt.textContent=`${new Date(start+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})} – ${new Date(end+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}${start===currentStart?' · Current week':''}`;picker.append(opt)});if(!picker.dataset.bound){picker.addEventListener('change',()=>renderSelectedWeek(picker.value));picker.dataset.bound='1';}}
         function renderSelectedWeek(start){
           const end=weekEndOf(start),rows=weeklyRows.filter(row=>row.date>=start&&row.date<=end&&((Number(row.gross)||0)>0||(Number(row.trips)||0)>0||(Number(row.helperHours)||0)>0));
