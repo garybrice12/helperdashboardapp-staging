@@ -298,6 +298,7 @@ function unavailablePayload(now = new Date()) {
     earningsSyncError: true,
     shiftSyncError: true,
     upcomingShifts: [],
+    weeklyRows: [],
     currentWeek: {
       weekStart: null,
       weekEnd: null,
@@ -400,6 +401,7 @@ function mapEarningsPage(page) {
     helperOutstanding: propNumber(props, 'Helper outstanding (£)'),
     helperBoost: propNumber(props, 'Helper boost (£)'),
     helperPayout: propNumber(props, 'Helper payout (£)'),
+    helperAdjustment: propNumber(props, 'Helper adjustment (£)'),
     paymentRef: propNumber(props, 'Payment ref'),
     helperHours: propNumber(props, 'Helper hours'),
     notes: propText(props, 'Notes'),
@@ -490,7 +492,9 @@ function makeRecentShift(rows) {
     gross: recent.gross,
     trips: recent.trips,
     helperTime: recent.shiftDuration || (recent.helperHours != null ? durationText(recent.helperHours) : ''),
-    helperPay: recent.helperPayout == null ? null : roundMoney(recent.helperPayout),
+    // The completed-shift card shows earned helper pay before separate adjustments
+    // (for example, the £5 mobile deduction). Keep payout/outstanding calculations unchanged.
+    helperPay: recent.helperPayout == null ? null : roundMoney(recent.helperPayout - (recent.helperAdjustment || 0)),
     // Original Earnings Log rule: Helper boost (£) is the trip boost.
     // Missing boost data stays null; a recorded zero remains £0. It is not added to helper pay.
     helperBoost: recent.helperBoost == null ? null : roundMoney(recent.helperBoost),
@@ -537,7 +541,25 @@ function makeCurrentWeek(rows, now) {
   const outstanding = weekRows.reduce((sum, row) => sum + (
     row.helperOutstanding ?? Math.max(0, (row.helperPayout || 0) - (row.helperPaid || 0))
   ), 0);
-  const hours = weekRows.reduce((sum, row) => sum + (row.helperHours || 0), 0);
+  // Use recorded decimal helper hours where present; otherwise derive duration from the logged shift-time range.
+  // This prevents the weekly total undercounting shifts whose Helper hours property was left blank.
+  const hours = weekRows.reduce((sum, row) => {
+    if (row.helperHours !== null && row.helperHours !== undefined && Number.isFinite(Number(row.helperHours))) {
+      return sum + Number(row.helperHours);
+    }
+    const timeText = String(row.shiftTime || extractTime(row.notes) || '').trim();
+    const parts = timeText.split(/\s*[–-]\s*/);
+    if (parts.length !== 2) return sum;
+    const toMinutes = value => {
+      const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+      return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+    };
+    const start = toMinutes(parts[0]);
+    const end = toMinutes(parts[1]);
+    if (start === null || end === null) return sum;
+    const duration = end >= start ? end - start : (24 * 60 - start + end);
+    return sum + duration / 60;
+  }, 0);
   const shiftCount = weekRows.length;
   const caption = `${displayDate(weekStart)}–${displayDate(weekEnd)} · ${shiftCount} helper shift${shiftCount === 1 ? '' : 's'} · £${earned.toFixed(2)} earned · £${paid.toFixed(2)} paid this week · £${outstanding.toFixed(2)} outstanding on these shifts`;
   return {
@@ -577,6 +599,20 @@ export function buildDashboardData({
     currentlyOwed,
     outstandingSyncError: !outstandingKnown,
     currentWeek: makeCurrentWeek(rows, now),
+    weeklyRows: rows.filter(row => row.withHelper && row.date).map(row => ({
+      date: row.date,
+      paidDate: row.paidDate,
+      gross: row.gross,
+      miles: row.miles,
+      trips: row.trips,
+      helperPaid: row.helperPaid,
+      helperOutstanding: row.helperOutstanding,
+      helperBoost: row.helperBoost,
+      helperPayout: row.helperPayout,
+      helperHours: row.helperHours,
+      shiftTime: row.shiftTime || extractTime(row.notes),
+      withHelper: row.withHelper
+    })),
     upcomingShifts: shiftError ? [] : makeLiveUpcomingShifts(shiftPages, today),
     shiftSyncError: Boolean(shiftError),
     earningsSyncError: false,

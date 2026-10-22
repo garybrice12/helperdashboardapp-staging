@@ -1,0 +1,23 @@
+HELPER DASHBOARD — CONNECTIONS TO CHECK AFTER DEPLOY
+
+1) Netlify site: https://app.netlify.com/sites/helperdashboardapp/configuration/env
+   Required environment variables: NOTION_TOKEN, OPENAI_API_KEY (for Ask AI). Required for production login: HELPER_SESSION_SECRET (long random secret; the function currently falls back to NOTION_TOKEN only if unset). Ensure the token can read Staff Profiles and write to the feedback inbox.
+
+2) Staff Profiles page/database: https://app.notion.com/p/7ac8a45d581042338ae7b457fce6a48c
+   Data source: collection://f9c437cb-bf7e-430d-ba44-a16038607edb
+   Required property: Helper PIN (rich text). Staff records should have an active Staff Status. Never put PINs in frontend code.
+
+3) Feedback inbox: https://app.notion.com/p/adaa450e85fc4bf583e277bb49f255ea
+   Data source: collection://34e1bc20-8f43-4b45-84a1-0cf9de860264
+   Give the Notion integration used by NOTION_TOKEN access to this database. Expected properties: Name (title), Feedback (rich text), Feedback type (select), App area (select), Review status (status).
+
+4) Work Planner — Shifts: https://app.notion.com/p/158b6e6a60ec4e93a12d7306a47edfd3
+   Data source ID expected by dashboard-data: 5f05970c-fcc0-497b-aa62-3e8edefbbb2b. If the app reports Notion 404, verify this exact data source is shared with the integration and update the Netlify environment variable NOTION_WORK_PLANNER_DATA_SOURCE_ID if the actual ID differs.
+
+5) Feedback page/hub: https://app.notion.com/p/56d8873ef58b4d7eb502027aee89ec43
+
+Deployment notes:
+- Upload the contents of this folder to the EXISTING helperdashboardapp Netlify site (do not upload the ZIP file itself if Netlify asks for a folder).
+- The login profile and feedback form are included in this build. Real authentication/data writing depend on the environment variables and Notion integration permissions above.
+- The signed-in requests endpoint returns only request records whose Name exactly matches the signed-in staff profile name. The current request database has no Staff Profile relation, so this is a conservative exact-name filter, not a strong identity relation. For stronger isolation, add a Staff Profile relation to the request database and populate it for each new request.
+- Live Notion API and production deployment were not performed from this package build.

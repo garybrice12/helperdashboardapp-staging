@@ -1,0 +1,21 @@
+HELPER DASHBOARD — CONSOLIDATED BUILD
+
+Deploy this folder to the EXISTING helperdashboardapp Netlify site. Do not connect or push to GitHub for this manual deployment.
+
+Included: branding, graphic fit without cropping, Tools navigation label, Restaurant Timer link, completed-shift helper pay before signed adjustments, weekly helper-time fallback, and AI live-data/question-routing fixes.
+
+On a computer with Node.js installed:
+1. Extract this ZIP.
+2. Open a terminal in the extracted folder.
+3. Run: npm install
+4. Run: npx netlify login
+5. Run: npx netlify link (select the existing helperdashboardapp site)
+6. Run: npx netlify deploy --prod
+
+Keep existing environment variables, especially NOTION_TOKEN and OPENAI_API_KEY. This deployment does not grant Notion permissions.
+
+After deploying, check /api/dashboard-data and test AI questions: “When is the next shift?”, “When must I respond?”, “How is helper pay calculated?” and “How much is outstanding?”.
+
+Important: the Restaurant Timer menu item opens the existing Notion timer test page; full native integration needs the actual timer HTML source package, which was not present in the recovered project.
+
+- Added authenticated staff request listing filtered by exact staff-profile name. For stronger identity isolation, add a Staff Profile relation to the request database in a later schema update.

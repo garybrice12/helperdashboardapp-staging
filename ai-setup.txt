@@ -1,0 +1,11 @@
+HELPER ASSISTANT — ONE-TIME NETLIFY SETUP
+
+1. Deploy this ZIP to the helperdashboardapp Netlify site.
+2. Test https://helperdashboardapp.netlify.app/#ask-ai
+3. The approved built-in answers work without an API key.
+4. For flexible AI answers, open Site configuration > Environment variables and add OPENAI_API_KEY with the private API key.
+5. Optional: add OPENAI_MODEL. If omitted, the function uses gpt-4.1-mini.
+6. Redeploy after changing environment variables if Netlify requests it.
+
+Security: never place the API key inside index.html or any public JavaScript file.
+Approved helper facts are held server-side in netlify/functions/ask-ai.mjs. Refresh those facts whenever the dashboard's live shift/pay information is updated.
