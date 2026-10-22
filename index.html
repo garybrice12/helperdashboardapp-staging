@@ -181,21 +181,32 @@
         set('owed-amount',money(d.currentlyOwed));set('owed-detail',`Synced from the Notion Earnings Log${d.updatedAt?' · '+new Date(d.updatedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):''}.`);
         set('latest-payment',money(pay.amount));set('payment-reference',pay.amount==null?'No payment recorded':`Reference ${pay.reference||''} · ${pay.date||''}`);set('payment-status',pay.amount==null?'No record':'Paid');
         const breakdown=document.getElementById('payment-breakdown');if(breakdown){breakdown.innerHTML='';if(Array.isArray(pay.breakdown)&&pay.breakdown.length){pay.breakdown.forEach(x=>{const li=document.createElement('li'),ico=document.createElement('span'),body=document.createElement('div'),b=document.createElement('b'),small=document.createElement('small');ico.className='ico';ico.textContent='✓';b.textContent=x.label||'Payment entry';small.textContent=x.detail||'';body.append(b,small);li.append(ico,body);breakdown.append(li)})}else{const li=document.createElement('li');li.textContent='No payment breakdown available.';breakdown.append(li)}}
-        const weeklyRows=Array.isArray(d.weeklyRows)?d.weeklyRows:[];
+        // Keep one entry per Notion page. The Notion query is paginated, and
+        // page IDs prevent a repeated record from inflating weekly totals.
+        const rawWeeklyRows=Array.isArray(d.weeklyRows)?d.weeklyRows:[];
+        const seenWeeklyIds=new Set();
+        const weeklyRows=rawWeeklyRows.filter(row=>{
+          if(!row||!row.date)return false;
+          if(!row.id)return true;
+          if(seenWeeklyIds.has(row.id))return false;
+          seenWeeklyIds.add(row.id);return true;
+        });
         const picker=document.getElementById('week-picker');
         const isoDate=date=>date.toISOString().slice(0,10);
         const mondayOf=date=>{const x=new Date(date+'T12:00:00Z');const day=(x.getUTCDay()+6)%7;x.setUTCDate(x.getUTCDate()-day);return isoDate(x)};
         const weekEndOf=start=>{const x=new Date(start+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+6);return isoDate(x)};
         const currentStart=w.weekStart||mondayOf(new Date().toISOString().slice(0,10));
-        const weekStarts=[...new Set([currentStart,...weeklyRows.map(row=>row.date?mondayOf(row.date):null).filter(Boolean)])].sort().reverse();
-        if(picker){picker.innerHTML='';weekStarts.forEach(start=>{const end=weekEndOf(start),opt=document.createElement('option');opt.value=start;opt.textContent=`${new Date(start+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'})} – ${new Date(end+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}${start===currentStart?' · Current week':''}`;picker.append(opt)});if(!picker.dataset.bound){picker.addEventListener('change',()=>renderSelectedWeek(picker.value));picker.dataset.bound='1';}}
+        // Build the selector from every dated helper earnings record returned
+        // by the paginated API, not just records in the current week.
+        const weekStarts=[...new Set([currentStart,...weeklyRows.map(row=>mondayOf(row.date))])].sort().reverse();
+        if(picker){picker.innerHTML='';weekStarts.forEach(start=>{const end=weekEndOf(start),opt=document.createElement('option');opt.value=start;opt.textContent=`${new Date(start+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})} – ${new Date(end+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}${start===currentStart?' · Current week':''}`;picker.append(opt)});if(!picker.dataset.bound){picker.addEventListener('change',()=>renderSelectedWeek(picker.value));picker.dataset.bound='1';}}
         function renderSelectedWeek(start){
           const end=weekEndOf(start),rows=weeklyRows.filter(row=>row.date>=start&&row.date<=end&&((Number(row.gross)||0)>0||(Number(row.trips)||0)>0||(Number(row.helperHours)||0)>0));
           const paidRows=weeklyRows.filter(row=>row.paidDate&&row.paidDate>=start&&row.paidDate<=end);
           const hoursOf=row=>{if(row.helperHours!==null&&row.helperHours!==undefined&&Number.isFinite(Number(row.helperHours)))return Number(row.helperHours);const m=String(row.shiftTime||'').match(/(\d{1,2}):(\d{2})\s*(am|pm)?\s*[–-]\s*(\d{1,2}):(\d{2})\s*(am|pm)?/i);if(!m)return 0;const mins=(h,mi,suf)=>{let v=Number(h);if(suf){if(suf.toLowerCase()==='pm'&&v<12)v+=12;if(suf.toLowerCase()==='am'&&v===12)v=0;}return v*60+Number(mi)};let a=mins(m[1],m[2],m[3]),b=mins(m[4],m[5],m[6]);if(b<a)b+=1440;return (b-a)/60};
           const hours=rows.reduce((sum,row)=>sum+hoursOf(row),0),gross=rows.reduce((sum,row)=>sum+(Number(row.gross)||0),0),trips=rows.reduce((sum,row)=>sum+(Number(row.trips)||0),0),boost=rows.reduce((sum,row)=>sum+(Number(row.helperBoost)||0),0),fuel=rows.reduce((sum,row)=>sum+(Number(row.miles)||0)*.30,0),earned=rows.reduce((sum,row)=>sum+(Number(row.helperPayout)||0),0),paid=paidRows.reduce((sum,row)=>sum+(Number(row.helperPaid)||0),0),outstanding=rows.reduce((sum,row)=>sum+(row.helperOutstanding!=null?Number(row.helperOutstanding):Math.max(0,(Number(row.helperPayout)||0)-(Number(row.helperPaid)||0))),0);
           const fmtDate=(value,year=false)=>new Date(value+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',...(year?{year:'numeric'}:{}),timeZone:'UTC'});
-          set('week-dates',`${fmtDate(start)} – ${fmtDate(end,true)}`);set('week-shifts',rows.length);set('week-hours',hoursText(hours));set('week-earned',money(earned));set('week-paid',money(paid));set('week-outstanding',money(outstanding));set('week-caption',`${rows.length} helper shifts · ${money(earned)} earned · ${money(paid)} paid in this week · ${money(outstanding)} outstanding on these shifts`);
+          set('week-dates',`${fmtDate(start)} – ${fmtDate(end,true)}`);set('week-shifts',rows.length);set('week-hours',hoursText(hours));set('week-earned',money(earned));set('week-paid',money(paid));set('week-outstanding',money(outstanding));set('week-caption',rows.length?'Totals are based on helper earnings records for the selected week.':'No helper earnings recorded for this week.');
           set('weekly-breakdown-dates',`${fmtDate(start)} – ${fmtDate(end,true)}`);set('wb-average-shift',rows.length?money(gross/rows.length):'—');set('wb-hourly',hours>0?money(gross/hours):'—');set('wb-trips',trips);set('wb-trips-hour',hours>0?(trips/hours).toFixed(1):'—');set('wb-gross',money(gross));set('wb-fuel',money(fuel));set('wb-boost',money(boost));set('wb-unpaid',rows.filter(row=>!(Number(row.helperPaid)>0)).length);
         }
         if(picker){picker.value=currentStart;renderSelectedWeek(currentStart);}else{set('week-dates',w.weekStart&&w.weekEnd?`${new Date(w.weekStart+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'})} – ${new Date(w.weekEnd+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}`:'Current week');set('week-shifts',w.shiftCount??'—');set('week-hours',hoursText(w.hours));set('week-earned',money(w.earned));set('week-paid',money(w.paid));set('week-outstanding',money(w.outstanding));set('week-caption',w.caption||'Weekly totals calculated from completed helper earnings records.');}

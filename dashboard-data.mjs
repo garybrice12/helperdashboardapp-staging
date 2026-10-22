@@ -390,6 +390,7 @@ function makeLiveUpcomingShifts(pages, today) {
 function mapEarningsPage(page) {
   const props = page?.properties || {};
   return {
+    id: page?.id || null,
     day: propTitle(props, 'Day'),
     date: propDate(props, 'Date'),
     paidDate: propDate(props, 'Date paid'),
@@ -600,6 +601,7 @@ export function buildDashboardData({
     outstandingSyncError: !outstandingKnown,
     currentWeek: makeCurrentWeek(rows, now),
     weeklyRows: rows.filter(row => row.withHelper && row.date).map(row => ({
+      id: row.id,
       date: row.date,
       paidDate: row.paidDate,
       gross: row.gross,

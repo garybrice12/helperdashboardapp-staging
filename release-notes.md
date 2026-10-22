@@ -33,3 +33,10 @@ Included in this build:
 - Removed the duplicate Currently Owed card from Pay; latest payment history and the Helper Day Pay Agreement remain.
 - Reduced the shift graphic height while keeping the image fully visible with `object-fit: contain`.
 - No production deploy or Notion record changes were made.
+
+## 23 October 2026 — weekly selector and duplicate-summary patch
+- Rebuilt the week selector options from all dated helper Earnings Log records returned by the paginated dashboard endpoint; week labels now include the year on both dates.
+- Added Notion page IDs to weekly rows and suppresses repeated IDs in the browser before totals are calculated, preventing duplicate copies of the same Notion record from inflating totals.
+- Removed the repeated weekly totals sentence from the graphic footer; the stat tiles remain the single display of weekly totals, and the footer now describes the data source or reports an empty week.
+- Local validation: `node --check netlify/functions/dashboard-data.mjs` passed; inline scripts in both HTML entry files parsed successfully.
+- Limitation: built from the recovered ZIP, not a fresh checkout of GitHub. Live Notion data and Netlify deployment have not been verified in this session.
