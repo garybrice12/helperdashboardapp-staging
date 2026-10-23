@@ -9,8 +9,8 @@
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
 <meta content="Helper shifts, availability and pay progress in one place." name="description"/>
-<link rel="icon" href="/api/dashboard-image?asset=shift&v=graphic-control"/>
-<link rel="apple-touch-icon" href="/api/dashboard-image?asset=shift&v=graphic-control"/>
+<link rel="icon" href="/api/dashboard-image?asset=logo&v=graphic-control"/>
+<link rel="apple-touch-icon" href="/api/dashboard-image?asset=logo&v=graphic-control"/>
 <link rel="manifest" href="/manifest.webmanifest"/>
 <title>Helper Dashboard</title>
 <style>
@@ -33,6 +33,23 @@
 
 .staff-card{display:none;align-items:center;gap:16px;padding:16px}.staff-card.visible{display:flex}.staff-photo{width:88px;height:88px;flex:0 0 88px;border-radius:12px;object-fit:cover;background:#e8edf2}.staff-meta{min-width:0}.staff-meta h2{font-size:20px;margin-bottom:5px}.login-box{padding:16px}.login-row{display:flex;gap:8px}.login-row input{min-width:0;flex:1;border:1px solid var(--border);border-radius:10px;padding:12px;font-size:16px}.form-label{display:block;font-weight:700;font-size:13px;margin:10px 0 5px}.feedback-form select,.feedback-form input,.feedback-form textarea{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;font:inherit;background:white}.feedback-form textarea{min-height:110px;resize:vertical}.form-status{font-size:13px;margin-top:10px}.help-links{display:grid;gap:9px}.help-links .btn{width:100%}
 @media(max-width:480px){.staff-photo{width:72px;height:72px;flex-basis:72px}.staff-card{gap:12px;padding:13px}}
+
+    .live-graphic{padding:20px;background:linear-gradient(140deg,#05080d 0%,#0b1a2d 55%,#07101b 100%);color:#f7fbff;border:1px solid #1c4e7d;border-radius:12px;overflow:hidden}
+.week-graphic{background:linear-gradient(140deg,#071a25 0%,#102d3b 58%,#08131f 100%);border-color:#246c79}
+.graphic-kicker{font-size:10px;font-weight:900;letter-spacing:.12em;color:#59d4ff;text-transform:uppercase}
+.week-graphic .graphic-kicker{color:#73e0aa}
+.live-graphic h3{font-size:23px;line-height:1.2;margin:8px 0;color:#fff}
+.graphic-location{margin:0;color:#c4d5e7;font-size:14px}
+.graphic-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:16px}
+.graphic-stats>div{padding:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:9px;min-width:0}
+.graphic-stats b{display:block;font-size:19px;line-height:1.2;color:#fff;overflow-wrap:anywhere}
+.graphic-stats span{display:block;font-size:11px;color:#bfd0df;margin-top:4px}
+.graphic-footer{margin:14px 0 0;color:#c7d9e8;font-size:12px}
+#connection-status .dot{background:#20b777}
+#connection-status.sync-error{color:#b45309}
+#connection-status.sync-error .dot{background:#d97706}
+@media(min-width:620px){.graphic-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.live-graphic{padding:24px}}
+
 </style>
 
 <style>
@@ -66,7 +83,8 @@
 <div class="facts"><div class="fact"><b id="next-gross">—</b><span>Target gross</span></div><div class="fact"><b id="next-trips">—</b><span>Target trips</span></div><div class="fact"><b id="next-pay">—</b><span>Est. helper pay</span></div><div class="fact"><b id="next-hours">—</b><span>Planned time</span></div></div>
 <div class="status" id="next-quest">Quest status will appear when live data loads.</div>
 
-</div></article><div class="section-title">Work controls</div><article class="card"><div class="card-pad"><a class="link-card control-link" href="https://app.notion.com/p/1735a933ee5045bc91cefffb6e4f49a1" rel="noopener" style="width:100%" target="_blank"><span class="ico">✅</span><div><b>Shift availability</b><small>Submit or update your availability</small></div><span class="chev">›</span></a></div></article>
+</div></article>
+
 <div class="section-title">Current-week progress</div>
 <article class="card"><div class="card-pad week-controls"><label for="week-picker" style="display:block;font-weight:700;margin-bottom:6px">Select week</label><select id="week-picker" style="width:100%;padding:11px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text)"><option value="">Loading weeks…</option></select></div><div class="live-graphic week-graphic"><div class="graphic-kicker">MONDAY–SUNDAY · LIVE FROM EARNINGS LOG</div><h3 id="week-dates">Current week</h3><div class="graphic-stats"><div><b id="week-shifts">—</b><span>Worked helper shifts</span></div><div><b id="week-hours">—</b><span>Helper time</span></div><div><b id="week-earned">—</b><span>Earned</span></div><div><b id="week-paid">—</b><span>Paid this week</span></div><div><b id="week-outstanding">—</b><span>Outstanding on these shifts</span></div></div><p class="graphic-footer" id="week-caption">Waiting for live weekly data…</p></div></article>
 <details class="card" id="weekly-breakdown"><summary style="cursor:pointer;padding:16px 18px;font-weight:800">Weekly breakdown</summary><div class="card-pad"><p class="sub" id="weekly-breakdown-dates">Select a week to view the breakdown.</p><div class="facts">
@@ -83,12 +101,15 @@
 <section aria-labelledby="shifts-tab" class="view" id="shifts">
 <div class="section-title">Live shift graphic</div>
 <article class="card"><div class="media-wrap shift-image-wrap"><img id="live-shift-image" class="media live-shift-image" src="/api/dashboard-image?v=3" alt="Current live helper shift graphic from Notion Graphic Control" loading="eager"/><p class="caption" id="live-shift-image-caption">Live graphic synced from Notion Graphic Control.</p></div></article>
+<div class="section-title">Work controls</div><article class="card"><div class="card-pad"><a class="link-card control-link" href="https://app.notion.com/p/1735a933ee5045bc91cefffb6e4f49a1" rel="noopener" style="width:100%" target="_blank"><span class="ico">✅</span><div><b>Shift availability</b><small>Submit or update your availability</small></div><span class="chev">›</span></a></div></article>
 <div class="section-title">Your shift requests</div>
 <article class="card"><div class="card-pad"><p class="sub" id="my-requests-status">Sign in to view requests submitted under your staff profile.</p><ul class="list" id="my-requests-list" style="margin-top:10px"></ul></div></article>
 <div class="section-title">Recent completed shift</div>
 <article class="card"><div class="card-pad"><div class="eyebrow"><span class="tag green">Completed</span><span id="recent-day">—</span></div><h2 id="recent-location-time" style="font-size:20px">—</h2><div class="facts"><div class="fact"><b id="recent-gross">—</b><span>Actual gross</span></div><div class="fact"><b id="recent-trips">—</b><span>Trips</span></div><div class="fact"><b id="recent-time">—</b><span>Helper time</span></div><div class="fact"><b id="recent-pay">—</b><span>Helper pay</span></div><div class="fact"><b id="recent-boost">—</b><span>Trip boost</span></div></div></div></article>
 </section>
 <section aria-labelledby="pay-tab" class="view" id="pay">
+<div class="section-title">Outstanding helper pay</div>
+<article class="card"><div class="card-pad"><div class="amount-row"><div><b id="owed-amount" style="font-size:28px">—</b><p class="sub" id="owed-detail">Loading outstanding balance from the Notion Earnings Log…</p></div><span class="paid" id="owed-status">Outstanding</span></div></div></article>
 <div class="section-title">Latest payment</div>
 <article class="card"><div class="card-pad"><div class="amount-row"><div><b id="latest-payment" style="font-size:20px">—</b><p class="sub" id="payment-reference">No payment loaded</p></div><span class="paid" id="payment-status">Paid</span></div><ul class="list" id="payment-breakdown" style="margin-top:12px"></ul></div></article>
 <article class="card"><a class="link-card card-pad" href="https://app.notion.com/p/cb764d07e9834ad1a52b00bd46f50be7" rel="noopener" target="_blank"><span class="ico">🧾</span><div><b>Pay Breakdowns</b><small>Open individual helper pay calculations, payment references and outstanding balances</small></div><span class="chev">›</span></a></article>
@@ -168,7 +189,6 @@
           set('next-gross',null);set('next-trips',null);set('next-pay',null);set('next-hours',null);set('next-quest','Quest status unavailable');
           set('owed-amount',null);set('owed-detail','Live Notion connection unavailable — no balance shown.');
           set('latest-payment',null);set('payment-reference','Payment data unavailable');set('payment-status','Unavailable');
-          set('week-caption','Live weekly data unavailable');set('week-shifts','—');set('week-hours','—');set('week-earned','—');set('week-paid','—');set('week-outstanding','—');
           return;
         }
         if(status){if(d.syncError){status.classList.add('sync-error');status.innerHTML='<span class="dot"></span>Sync issue'}else{status.classList.remove('sync-error');status.innerHTML='<span class="dot"></span>Live data'}}
@@ -181,6 +201,7 @@
         set('owed-amount',money(d.currentlyOwed));set('owed-detail',`Synced from the Notion Earnings Log${d.updatedAt?' · '+new Date(d.updatedAt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):''}.`);
         set('latest-payment',money(pay.amount));set('payment-reference',pay.amount==null?'No payment recorded':`Reference ${pay.reference||''} · ${pay.date||''}`);set('payment-status',pay.amount==null?'No record':'Paid');
         const breakdown=document.getElementById('payment-breakdown');if(breakdown){breakdown.innerHTML='';if(Array.isArray(pay.breakdown)&&pay.breakdown.length){pay.breakdown.forEach(x=>{const li=document.createElement('li'),ico=document.createElement('span'),body=document.createElement('div'),b=document.createElement('b'),small=document.createElement('small');ico.className='ico';ico.textContent='✓';b.textContent=x.label||'Payment entry';small.textContent=x.detail||'';body.append(b,small);li.append(ico,body);breakdown.append(li)})}else{const li=document.createElement('li');li.textContent='No payment breakdown available.';breakdown.append(li)}}
+
         // Keep one entry per Notion page. The Notion query is paginated, and
         // page IDs prevent a repeated record from inflating weekly totals.
         const rawWeeklyRows=Array.isArray(d.weeklyRows)?d.weeklyRows:[];
@@ -202,16 +223,13 @@
         const mondayOf=date=>{const x=new Date(date+'T12:00:00Z');const day=(x.getUTCDay()+6)%7;x.setUTCDate(x.getUTCDate()-day);return isoDate(x)};
         const weekEndOf=start=>{const x=new Date(start+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+6);return isoDate(x)};
         const currentStart=w.weekStart||mondayOf(new Date().toISOString().slice(0,10));
-        // Discover weeks from all dated Earnings Log records, because older
-        // helper rows may have a blank/unchecked 'With helper' checkbox even
-        // when helper hours or payout are recorded. Keep eligibility for totals
-        // separate so solo-only rows do not inflate helper progress.
-        const isHelperRow=row=>row.withHelper===true || Number(row.helperHours)>0 || Number(row.helperPayout)>0 || Number(row.helperPaid)>0 || Number(row.helperOutstanding)>0;
-        const weekStarts=[...new Set([currentStart,...weeklyRows.filter(row=>row.date&&isHelperRow(row)).map(row=>mondayOf(row.date))])].sort().reverse();
+        // Build the selector from every dated helper earnings record returned
+        // by the paginated API, not just records in the current week.
+        const weekStarts=[...new Set([currentStart,...weeklyRows.filter(row=>row.date).map(row=>mondayOf(row.date))])].sort().reverse();
         if(picker){picker.innerHTML='';weekStarts.forEach(start=>{const end=weekEndOf(start),opt=document.createElement('option');opt.value=start;opt.textContent=`${new Date(start+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})} – ${new Date(end+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}${start===currentStart?' · Current week':''}`;picker.append(opt)});if(!picker.dataset.bound){picker.addEventListener('change',()=>renderSelectedWeek(picker.value));picker.dataset.bound='1';}}
         function renderSelectedWeek(start){
-          const end=weekEndOf(start),rows=weeklyRows.filter(row=>row.date>=start&&row.date<=end&&isHelperRow(row)&&((Number(row.gross)||0)>0||(Number(row.trips)||0)>0||(Number(row.helperHours)||0)>0));
-          const paidRows=weeklyRows.filter(row=>isHelperRow(row)&&row.paidDate&&row.paidDate>=start&&row.paidDate<=end);
+          const end=weekEndOf(start),rows=weeklyRows.filter(row=>row.date>=start&&row.date<=end&&((Number(row.gross)||0)>0||(Number(row.trips)||0)>0||(Number(row.helperHours)||0)>0));
+          const paidRows=weeklyRows.filter(row=>row.paidDate&&row.paidDate>=start&&row.paidDate<=end);
           const hoursOf=row=>{if(row.helperHours!==null&&row.helperHours!==undefined&&Number.isFinite(Number(row.helperHours)))return Number(row.helperHours);const m=String(row.shiftTime||'').match(/(\d{1,2}):(\d{2})\s*(am|pm)?\s*[–-]\s*(\d{1,2}):(\d{2})\s*(am|pm)?/i);if(!m)return 0;const mins=(h,mi,suf)=>{let v=Number(h);if(suf){if(suf.toLowerCase()==='pm'&&v<12)v+=12;if(suf.toLowerCase()==='am'&&v===12)v=0;}return v*60+Number(mi)};let a=mins(m[1],m[2],m[3]),b=mins(m[4],m[5],m[6]);if(b<a)b+=1440;return (b-a)/60};
           const hours=rows.reduce((sum,row)=>sum+hoursOf(row),0),gross=rows.reduce((sum,row)=>sum+(Number(row.gross)||0),0),trips=rows.reduce((sum,row)=>sum+(Number(row.trips)||0),0),boost=rows.reduce((sum,row)=>sum+(Number(row.helperBoost)||0),0),fuel=rows.reduce((sum,row)=>sum+(Number(row.miles)||0)*.30,0),earned=rows.reduce((sum,row)=>sum+(Number(row.helperPayout)||0),0),paid=paidRows.reduce((sum,row)=>sum+(Number(row.helperPaid)||0),0),outstanding=rows.reduce((sum,row)=>sum+(row.helperOutstanding!=null?Number(row.helperOutstanding):Math.max(0,(Number(row.helperPayout)||0)-(Number(row.helperPaid)||0))),0);
           const fmtDate=(value,year=false)=>new Date(value+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',...(year?{year:'numeric'}:{}),timeZone:'UTC'});
@@ -225,8 +243,7 @@
             const recentInWeek=recent.date&&String(recent.date).slice(0,10)>=start&&String(recent.date).slice(0,10)<=end;
             const fallbackRows=rows.length===0&&recentInWeek?[recent]:[];
             const sourceRows=rows.length?rows:fallbackRows;
-            const hoursFromRecentText=value=>{const m=String(value||'').match(/(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?/i);if(!m||(!m[1]&&!m[2]))return 0;return (Number(m[1])||0)+(Number(m[2])||0)/60};
-            const fallbackHours=sourceRows.reduce((sum,row)=>sum+(row.helperTime?hoursFromRecentText(row.helperTime):(row.helperHours!==null&&row.helperHours!==undefined&&Number(row.helperHours)>0?Number(row.helperHours):hoursOf(row))),0);
+            const fallbackHours=sourceRows.reduce((sum,row)=>sum+(Number(row.helperHours)||hoursOf(row)),0);
             const fallbackEarned=sourceRows.reduce((sum,row)=>sum+(Number(row.helperPayout??row.helperPay)||0),0);
             const fallbackPaid=sourceRows.reduce((sum,row)=>sum+(Number(row.helperPaid)||0),0);
             const fallbackOutstanding=sourceRows.reduce((sum,row)=>sum+(row.helperOutstanding!=null?Number(row.helperOutstanding):Math.max(0,(Number(row.helperPayout??row.helperPay)||0)-(Number(row.helperPaid)||0))),0);
@@ -243,7 +260,7 @@
           set('weekly-breakdown-dates',`${fmtDate(start)} – ${fmtDate(end,true)}`);set('wb-average-shift',rows.length?money(gross/rows.length):'—');set('wb-hourly',hours>0?money(gross/hours):'—');set('wb-trips',trips);set('wb-trips-hour',hours>0?(trips/hours).toFixed(1):'—');set('wb-gross',money(gross));set('wb-fuel',money(fuel));set('wb-boost',money(boost));set('wb-unpaid',rows.filter(row=>!(Number(row.helperPaid)>0)).length);
         }
         if(picker){picker.value=currentStart;renderSelectedWeek(currentStart);}else{set('week-dates',w.weekStart&&w.weekEnd?`${new Date(w.weekStart+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'})} – ${new Date(w.weekEnd+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}`:'Current week');set('week-shifts',w.shiftCount??'—');set('week-hours',hoursText(w.hours));set('week-earned',money(w.earned));set('week-paid',money(w.paid));set('week-outstanding',money(w.outstanding));set('week-caption',w.caption||'Weekly totals calculated from completed helper earnings records.');}
-      }catch(e){console.warn('Dashboard live-data load failed',e);if(status){status.classList.add('sync-error');status.innerHTML='<span class="dot"></span>Sync unavailable'}set('owed-amount',null);set('owed-detail','Live Notion connection unavailable — no balance shown.');set('week-caption','Live weekly data unavailable');}
+      }catch(e){console.warn('Dashboard live-data load failed',e);if(status){status.classList.add('sync-error');status.innerHTML='<span class="dot"></span>Sync unavailable'}set('owed-amount',null);set('owed-detail','Live Notion connection unavailable — no balance shown.');}
     }
     const liveShiftImage=document.getElementById('live-shift-image');
     if(liveShiftImage){const wrap=liveShiftImage.closest('.shift-image-wrap');const setBackdrop=()=>{if(wrap)wrap.style.setProperty('--shift-backdrop',`url(\"${liveShiftImage.currentSrc||liveShiftImage.src}\")`)};if(liveShiftImage.complete&&liveShiftImage.naturalWidth)setBackdrop();liveShiftImage.addEventListener('load',setBackdrop);liveShiftImage.addEventListener('error',()=>{const caption=document.getElementById('live-shift-image-caption');if(caption)caption.textContent='Live shift graphic could not load from Notion Graphic Control. Check the Notion image connection.';});}

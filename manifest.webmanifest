@@ -9,7 +9,7 @@
   "description": "Live helper shifts, availability and pay progress.",
   "icons": [
     {
-      "src": "/api/dashboard-image?asset=shift&v=graphic-control",
+      "src": "/api/dashboard-image?asset=logo&v=graphic-control",
       "sizes": "any",
       "purpose": "any"
     }
