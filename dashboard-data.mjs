@@ -33,6 +33,13 @@ function propNumber(props, name) {
   }
   return null;
 }
+function firstNumber(props, names) {
+  for (const name of names) {
+    const value = propNumber(props, name);
+    if (value !== null) return value;
+  }
+  return null;
+}
 function propDate(props, name) {
   const p = props?.[name];
   return p?.type === 'date' ? (p.date?.start || null) : null;
@@ -290,15 +297,9 @@ function makeLiveUpcomingShifts(pages) {
 }
 
 async function getNotionData(base) {
-  const [pages, summaryResult, shiftResult] = await Promise.all([
+  const [pages, shiftResult, summaryOutstanding] = await Promise.all([
     notionQueryAll(),
-    notionSummaryOutstanding()
-      .then(value => ({ value, error: false }))
-      .catch(error => {
-        // A summary-page mismatch must not blank every other dashboard figure.
-        console.error('Notion helper-pay summary sync failed; using Earnings Log fallback', error?.message || error);
-        return { value: null, error: true };
-      }),
+    notionSummaryOutstanding(),
     notionQuerySource(NOTION_SHIFTS_DATA_SOURCE_ID, 'Date', 'ascending')
       .then(pages => ({ pages, error: false }))
       .catch(error => {
@@ -306,7 +307,6 @@ async function getNotionData(base) {
         return { pages: [], error: true };
       })
   ]);
-  const summaryOutstanding = summaryResult.value;
   const shiftPages = shiftResult.pages;
   const rows = pages.map(page => {
     const p = page.properties || {};
@@ -322,7 +322,7 @@ async function getNotionData(base) {
       helperPaid: propNumber(p, 'Helper paid (£)') || 0,
       helperOutstanding: propNumber(p, 'Helper outstanding (£)'),
       helperPayout: propNumber(p, 'Helper payout (£)'),
-      helperBoost: propNumber(p, 'Helper boost (£)'),
+      helperBoost: firstNumber(p, ['Helper boost (£)', 'Trip boost (£)', 'Trip Boost (£)', 'Helper Trip Boost (£)', 'Trip boost']),
       paymentRef: propNumber(p, 'Payment ref'),
       helperHours: propNumber(p, 'Helper hours'),
       notes: propText(p, 'Notes'),
@@ -384,7 +384,8 @@ async function getNotionData(base) {
   const iso = d => d.toISOString().slice(0, 10);
   const weekStart = iso(monday), weekEnd = iso(sunday);
   const weekRows = helperRows.filter(r => r.date && r.date >= weekStart && r.date <= weekEnd &&
-    ((r.gross || 0) > 0 || (r.trips || 0) > 0 || (r.helperHours || 0) > 0));
+    ((r.gross || 0) > 0 || (r.trips || 0) > 0 || (r.helperHours || 0) > 0 ||
+     Boolean(r.shiftDuration) || Boolean(r.shiftTime) || Boolean(extractTime(r.notes))));
   const weekEarned = weekRows.reduce((sum, r) => sum + (r.helperPayout || 0), 0);
   const weekPaid = helperRows.filter(r => r.paidDate && r.paidDate >= weekStart && r.paidDate <= weekEnd)
     .reduce((sum, r) => sum + (r.helperPaid || 0), 0);
@@ -400,8 +401,7 @@ async function getNotionData(base) {
     nextShift,
     recentShift,
     latestPayment,
-    currentlyOwed: summaryOutstanding ?? Math.round(owed * 100) / 100,
-    outstandingSyncError: summaryResult.error,
+    currentlyOwed: summaryOutstanding,
     currentWeek,
     upcomingShifts,
     shiftSyncError: shiftResult.error,
