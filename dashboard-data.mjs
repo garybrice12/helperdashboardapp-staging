@@ -69,6 +69,26 @@ function propNumber(props, name) {
   return null;
 }
 
+// Notion property labels have changed between versions of the Earnings Log.
+// Prefer the canonical label, then known aliases; never treat a missing value as zero.
+function propNumberAny(props, names) {
+  for (const name of names) {
+    if (Object.prototype.hasOwnProperty.call(props || {}, name)) {
+      const value = propNumber(props, name);
+      if (value !== null && Number.isFinite(value)) return value;
+    }
+  }
+  const normalized = new Set(names.map(name => name.toLowerCase().replace(/[^a-z0-9]/g, '')));
+  for (const [name, property] of Object.entries(props || {})) {
+    if (!normalized.has(name.toLowerCase().replace(/[^a-z0-9]/g, ''))) continue;
+    const value = propNumber(props, name);
+    if (value !== null && Number.isFinite(value)) return value;
+    // A known matching property with a null value is unknown, not a zero.
+    if (property) return null;
+  }
+  return null;
+}
+
 function rollupNumber(rollup) {
   if (!rollup) return null;
   if (rollup.type === 'number') {
@@ -400,7 +420,7 @@ function mapEarningsPage(page) {
     withHelper: propCheckbox(props, 'With helper'),
     helperPaid: propNumber(props, 'Helper paid (£)'),
     helperOutstanding: propNumber(props, 'Helper outstanding (£)'),
-    helperBoost: propNumber(props, 'Helper boost (£)'),
+    helperBoost: propNumberAny(props, ['Helper boost (£)', 'Trip boost (£)', 'Trip Boost (£)', 'Trip boost', 'Trip Boost', 'Helper Boost (£)']),
     helperPayout: propNumber(props, 'Helper payout (£)'),
     helperAdjustment: propNumber(props, 'Helper adjustment (£)'),
     paymentRef: propNumber(props, 'Payment ref'),
@@ -616,7 +636,7 @@ export function buildDashboardData({
     currentlyOwed,
     outstandingSyncError: !outstandingKnown,
     currentWeek: makeCurrentWeek(rows, now),
-    weeklyRows: rows.filter(row => row.withHelper && row.date).map(row => ({
+    weeklyRows: rows.filter(row => row.date).map(row => ({
       id: row.id,
       date: row.date,
       paidDate: row.paidDate,

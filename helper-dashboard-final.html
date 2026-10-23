@@ -202,28 +202,41 @@
         const mondayOf=date=>{const x=new Date(date+'T12:00:00Z');const day=(x.getUTCDay()+6)%7;x.setUTCDate(x.getUTCDate()-day);return isoDate(x)};
         const weekEndOf=start=>{const x=new Date(start+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+6);return isoDate(x)};
         const currentStart=w.weekStart||mondayOf(new Date().toISOString().slice(0,10));
-        // Build the selector from every dated helper earnings record returned
-        // by the paginated API, not just records in the current week.
-        const weekStarts=[...new Set([currentStart,...weeklyRows.filter(row=>row.date).map(row=>mondayOf(row.date))])].sort().reverse();
+        // Discover weeks from all dated Earnings Log records, because older
+        // helper rows may have a blank/unchecked 'With helper' checkbox even
+        // when helper hours or payout are recorded. Keep eligibility for totals
+        // separate so solo-only rows do not inflate helper progress.
+        const isHelperRow=row=>row.withHelper===true || Number(row.helperHours)>0 || Number(row.helperPayout)>0 || Number(row.helperPaid)>0 || Number(row.helperOutstanding)>0;
+        const weekStarts=[...new Set([currentStart,...weeklyRows.filter(row=>row.date&&isHelperRow(row)).map(row=>mondayOf(row.date))])].sort().reverse();
         if(picker){picker.innerHTML='';weekStarts.forEach(start=>{const end=weekEndOf(start),opt=document.createElement('option');opt.value=start;opt.textContent=`${new Date(start+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})} – ${new Date(end+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}${start===currentStart?' · Current week':''}`;picker.append(opt)});if(!picker.dataset.bound){picker.addEventListener('change',()=>renderSelectedWeek(picker.value));picker.dataset.bound='1';}}
         function renderSelectedWeek(start){
-          const end=weekEndOf(start),rows=weeklyRows.filter(row=>row.date>=start&&row.date<=end&&((Number(row.gross)||0)>0||(Number(row.trips)||0)>0||(Number(row.helperHours)||0)>0));
-          const paidRows=weeklyRows.filter(row=>row.paidDate&&row.paidDate>=start&&row.paidDate<=end);
+          const end=weekEndOf(start),rows=weeklyRows.filter(row=>row.date>=start&&row.date<=end&&isHelperRow(row)&&((Number(row.gross)||0)>0||(Number(row.trips)||0)>0||(Number(row.helperHours)||0)>0));
+          const paidRows=weeklyRows.filter(row=>isHelperRow(row)&&row.paidDate&&row.paidDate>=start&&row.paidDate<=end);
           const hoursOf=row=>{if(row.helperHours!==null&&row.helperHours!==undefined&&Number.isFinite(Number(row.helperHours)))return Number(row.helperHours);const m=String(row.shiftTime||'').match(/(\d{1,2}):(\d{2})\s*(am|pm)?\s*[–-]\s*(\d{1,2}):(\d{2})\s*(am|pm)?/i);if(!m)return 0;const mins=(h,mi,suf)=>{let v=Number(h);if(suf){if(suf.toLowerCase()==='pm'&&v<12)v+=12;if(suf.toLowerCase()==='am'&&v===12)v=0;}return v*60+Number(mi)};let a=mins(m[1],m[2],m[3]),b=mins(m[4],m[5],m[6]);if(b<a)b+=1440;return (b-a)/60};
           const hours=rows.reduce((sum,row)=>sum+hoursOf(row),0),gross=rows.reduce((sum,row)=>sum+(Number(row.gross)||0),0),trips=rows.reduce((sum,row)=>sum+(Number(row.trips)||0),0),boost=rows.reduce((sum,row)=>sum+(Number(row.helperBoost)||0),0),fuel=rows.reduce((sum,row)=>sum+(Number(row.miles)||0)*.30,0),earned=rows.reduce((sum,row)=>sum+(Number(row.helperPayout)||0),0),paid=paidRows.reduce((sum,row)=>sum+(Number(row.helperPaid)||0),0),outstanding=rows.reduce((sum,row)=>sum+(row.helperOutstanding!=null?Number(row.helperOutstanding):Math.max(0,(Number(row.helperPayout)||0)-(Number(row.helperPaid)||0))),0);
           const fmtDate=(value,year=false)=>new Date(value+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',...(year?{year:'numeric'}:{}),timeZone:'UTC'});
-          // The current-week summary must use the backend's established currentWeek
-          // rollup. It is the same live calculation used by the previously working
-          // dashboard and does not depend on weeklyRows being complete.
           if(start===currentStart){
             const currentEnd=w.weekEnd||end;
             set('week-dates',w.weekStart&&w.weekEnd?`${fmtDate(w.weekStart)} – ${fmtDate(currentEnd,true)}`:`${fmtDate(start)} – ${fmtDate(end,true)}`);
-            set('week-shifts',w.shiftCount??rows.length);
-            set('week-hours',w.hours==null?hoursText(hours):hoursText(w.hours));
-            set('week-earned',w.earned==null?money(earned):money(w.earned));
-            set('week-paid',w.paid==null?money(paid):money(w.paid));
-            set('week-outstanding',w.outstanding==null?money(outstanding):money(w.outstanding));
-            set('week-caption',w.caption||'Current-week totals from the live Earnings Log rollup.');
+            // Calculate from dated Earnings Log rows when present. If the API
+            // returns no weekly rows but does return the recent helper shift,
+            // use that shift rather than displaying a misleading all-zero week.
+            const recent=d.recentShift||{};
+            const recentInWeek=recent.date&&String(recent.date).slice(0,10)>=start&&String(recent.date).slice(0,10)<=end;
+            const fallbackRows=rows.length===0&&recentInWeek?[recent]:[];
+            const sourceRows=rows.length?rows:fallbackRows;
+            const hoursFromRecentText=value=>{const m=String(value||'').match(/(?:(\d+)\s*h)?\s*(?:(\d+)\s*m)?/i);if(!m||(!m[1]&&!m[2]))return 0;return (Number(m[1])||0)+(Number(m[2])||0)/60};
+            const fallbackHours=sourceRows.reduce((sum,row)=>sum+(row.helperTime?hoursFromRecentText(row.helperTime):(row.helperHours!==null&&row.helperHours!==undefined&&Number(row.helperHours)>0?Number(row.helperHours):hoursOf(row))),0);
+            const fallbackEarned=sourceRows.reduce((sum,row)=>sum+(Number(row.helperPayout??row.helperPay)||0),0);
+            const fallbackPaid=sourceRows.reduce((sum,row)=>sum+(Number(row.helperPaid)||0),0);
+            const fallbackOutstanding=sourceRows.reduce((sum,row)=>sum+(row.helperOutstanding!=null?Number(row.helperOutstanding):Math.max(0,(Number(row.helperPayout??row.helperPay)||0)-(Number(row.helperPaid)||0))),0);
+            const useRollup=sourceRows.length===0&&Number(w.shiftCount||0)>0;
+            set('week-shifts',sourceRows.length?sourceRows.length:(useRollup?w.shiftCount:0));
+            set('week-hours',hoursText(sourceRows.length?fallbackHours:(useRollup?(w.hours??0):0)));
+            set('week-earned',money(sourceRows.length?fallbackEarned:(useRollup?(w.earned??0):0)));
+            set('week-paid',money(sourceRows.length?fallbackPaid:(useRollup?(w.paid??0):0)));
+            set('week-outstanding',money(sourceRows.length?fallbackOutstanding:(useRollup?(w.outstanding??0):0)));
+            set('week-caption',rows.length?'Totals are calculated from dated Earnings Log records for the selected week.':(fallbackRows.length?'Showing the recent completed shift because no weekly earnings rows were returned.':(useRollup?(w.caption||'Current-week totals from the live Earnings Log rollup.'):'No current-week helper earnings records were returned from Notion.')));
           }else{
             set('week-dates',`${fmtDate(start)} – ${fmtDate(end,true)}`);set('week-shifts',rows.length);set('week-hours',hoursText(hours));set('week-earned',money(earned));set('week-paid',money(paid));set('week-outstanding',money(outstanding));set('week-caption',rows.length?'Totals are based on helper earnings records for the selected week.':'No helper earnings recorded for this week.');
           }

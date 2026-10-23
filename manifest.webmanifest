@@ -8,6 +8,10 @@
   "theme_color": "#0b1a2d",
   "description": "Live helper shifts, availability and pay progress.",
   "icons": [
-    {"src":"/api/dashboard-image?asset=shift&v=graphic-control","sizes":"any","type":"image/png","purpose":"any"}
+    {
+      "src": "/api/dashboard-image?asset=shift&v=graphic-control",
+      "sizes": "any",
+      "purpose": "any"
+    }
   ]
 }
