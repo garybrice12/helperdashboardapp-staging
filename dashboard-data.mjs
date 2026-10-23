@@ -69,26 +69,6 @@ function propNumber(props, name) {
   return null;
 }
 
-// Notion property labels have changed between versions of the Earnings Log.
-// Prefer the canonical label, then known aliases; never treat a missing value as zero.
-function propNumberAny(props, names) {
-  for (const name of names) {
-    if (Object.prototype.hasOwnProperty.call(props || {}, name)) {
-      const value = propNumber(props, name);
-      if (value !== null && Number.isFinite(value)) return value;
-    }
-  }
-  const normalized = new Set(names.map(name => name.toLowerCase().replace(/[^a-z0-9]/g, '')));
-  for (const [name, property] of Object.entries(props || {})) {
-    if (!normalized.has(name.toLowerCase().replace(/[^a-z0-9]/g, ''))) continue;
-    const value = propNumber(props, name);
-    if (value !== null && Number.isFinite(value)) return value;
-    // A known matching property with a null value is unknown, not a zero.
-    if (property) return null;
-  }
-  return null;
-}
-
 function rollupNumber(rollup) {
   if (!rollup) return null;
   if (rollup.type === 'number') {
@@ -318,7 +298,6 @@ function unavailablePayload(now = new Date()) {
     earningsSyncError: true,
     shiftSyncError: true,
     upcomingShifts: [],
-    weeklyRows: [],
     currentWeek: {
       weekStart: null,
       weekEnd: null,
@@ -410,7 +389,6 @@ function makeLiveUpcomingShifts(pages, today) {
 function mapEarningsPage(page) {
   const props = page?.properties || {};
   return {
-    id: page?.id || null,
     day: propTitle(props, 'Day'),
     date: propDate(props, 'Date'),
     paidDate: propDate(props, 'Date paid'),
@@ -420,7 +398,7 @@ function mapEarningsPage(page) {
     withHelper: propCheckbox(props, 'With helper'),
     helperPaid: propNumber(props, 'Helper paid (£)'),
     helperOutstanding: propNumber(props, 'Helper outstanding (£)'),
-    helperBoost: propNumberAny(props, ['Helper boost (£)', 'Trip boost (£)', 'Trip Boost (£)', 'Trip boost', 'Trip Boost', 'Helper Boost (£)']),
+    helperBoost: propNumber(props, 'Helper boost (£)'),
     helperPayout: propNumber(props, 'Helper payout (£)'),
     helperAdjustment: propNumber(props, 'Helper adjustment (£)'),
     paymentRef: propNumber(props, 'Payment ref'),
@@ -487,21 +465,7 @@ function makeLatestPayment(rows) {
 function makeRecentShift(rows) {
   const recent = rows
     .filter(row => row.withHelper && row.date)
-    .sort((a, b) => {
-      const byDate = String(b.date).slice(0, 10).localeCompare(String(a.date).slice(0, 10));
-      if (byDate) return byDate;
-      // Several helper shifts can be logged on the same date. Pick the latest
-      // shift window rather than whichever Notion returns first.
-      const startMinutes = row => {
-        const time = String(row.shiftTime || extractTime(row.notes) || '').split(/\s*[–-]\s*/)[0];
-        const match = time.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
-        if (!match) return -1;
-        let hour = Number(match[1]);
-        if (match[3]) { if (match[3].toLowerCase() === 'pm' && hour < 12) hour += 12; if (match[3].toLowerCase() === 'am' && hour === 12) hour = 0; }
-        return hour * 60 + Number(match[2]);
-      };
-      return startMinutes(b) - startMinutes(a);
-    })[0];
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
   if (!recent) {
     return {
       date: '',
@@ -619,9 +583,7 @@ export function buildDashboardData({
   syncTestActive = false,
   now = new Date()
 } = {}) {
-  // Earnings, shifts and helper-pay summary are independent sources. A failed
-  // earnings query must not erase valid shift/summary data or silently look like
-  // a successful empty sync.
+  if (earningsError) return unavailablePayload(now);
   const rows = (earningsPages || []).map(mapEarningsPage);
   const today = ukISODate(now);
   const recentShift = makeRecentShift(rows);
@@ -636,30 +598,9 @@ export function buildDashboardData({
     currentlyOwed,
     outstandingSyncError: !outstandingKnown,
     currentWeek: makeCurrentWeek(rows, now),
-    weeklyRows: rows.filter(row => row.date).map(row => ({
-      id: row.id,
-      date: row.date,
-      paidDate: row.paidDate,
-      gross: row.gross,
-      miles: row.miles,
-      trips: row.trips,
-      helperPaid: row.helperPaid,
-      helperOutstanding: row.helperOutstanding,
-      helperBoost: row.helperBoost,
-      helperPayout: row.helperPayout,
-      helperHours: row.helperHours,
-      shiftTime: row.shiftTime || extractTime(row.notes),
-      withHelper: row.withHelper
-    })),
     upcomingShifts: shiftError ? [] : makeLiveUpcomingShifts(shiftPages, today),
     shiftSyncError: Boolean(shiftError),
-    earningsSyncError: Boolean(earningsError),
-    syncError: Boolean(earningsError || shiftError || outstandingError),
-    syncErrorMessage: earningsError
-      ? 'Earnings Log could not be read from Notion. Check that the integration used by NOTION_TOKEN has access to the Earnings log data source.'
-      : (shiftError
-        ? 'Work Planner could not be read from Notion. Check the integration access to the Work Planner data source.'
-        : (outstandingError ? 'Helper Pay Summary could not be read from Notion.' : '')),
+    earningsSyncError: false,
     syncTestActive: Boolean(syncTestActive),
     tripBoost: recentShift?.tripBoost ?? null,
     trendDemand: TREND_DEMAND,

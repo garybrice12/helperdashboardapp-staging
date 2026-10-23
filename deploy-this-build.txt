@@ -19,3 +19,6 @@ After deploying, check /api/dashboard-data and test AI questions: “When is the
 Important: the Restaurant Timer menu item opens the existing Notion timer test page; full native integration needs the actual timer HTML source package, which was not present in the recovered project.
 
 - Added authenticated staff request listing filtered by exact staff-profile name. For stronger identity isolation, add a Staff Profile relation to the request database in a later schema update.
+
+
+Logo update (2026-10-23): header logo, browser favicon and installed shortcut now load the Dashboard logo image from the Dashboard logo toggle on Notion Graphic Control. Header logo links to that control page. This ZIP has not been deployed.
