@@ -91,6 +91,8 @@
 <article class="card"><div class="card-pad"><div class="eyebrow"><span class="tag green">Completed</span><span id="recent-day">—</span></div><h2 id="recent-location-time" style="font-size:20px">—</h2><div class="facts"><div class="fact"><b id="recent-gross">—</b><span>Actual gross</span></div><div class="fact"><b id="recent-trips">—</b><span>Trips</span></div><div class="fact"><b id="recent-time">—</b><span>Helper time</span></div><div class="fact"><b id="recent-pay">—</b><span>Helper pay</span></div><div class="fact"><b id="recent-boost">—</b><span>Trip boost</span></div></div></div></article>
 </section>
 <section aria-labelledby="pay-tab" class="view" id="pay">
+<article class="card"><a class="link-card card-pad" href="https://app.notion.com/p/cb764d07e9834ad1a52b00bd46f50be7" rel="noopener" target="_blank"><span class="ico">🧾</span><div><b>Pay Breakdowns</b><small>Open individual helper pay calculations, payment references and outstanding balances</small></div><span class="chev">›</span></a></article>
+
 <div class="section-title">Latest payment</div>
 <article class="card"><div class="card-pad"><div class="amount-row"><div><b id="latest-payment" style="font-size:20px">—</b><p class="sub" id="payment-reference">No payment loaded</p></div><span class="paid" id="payment-status">Paid</span></div><ul class="list" id="payment-breakdown" style="margin-top:12px"></ul></div></article>
 <article class="card"><a class="link-card card-pad" href="https://www.notion.so/aed02957bc3b43e48d4d5194b86092b9" rel="noopener" target="_blank"><span class="ico">🤝</span><div><b>Helper Day Pay Agreement</b><small>Open the current working agreement</small></div><span class="chev">›</span></a></article>
@@ -187,6 +189,10 @@
         const seenWeeklyKeys=new Set();
         const weeklyRows=rawWeeklyRows.filter(row=>{
           if(!row||typeof row.date!=='string'||!/^\d{4}-\d{2}-\d{2}/.test(row.date))return false;
+          // Notion date properties may include a time and timezone. Normalize
+          // dates before week grouping/comparison so Sunday rows are not lost.
+          row.date=row.date.slice(0,10);
+          if(typeof row.paidDate==='string'&&row.paidDate.length>=10)row.paidDate=row.paidDate.slice(0,10);
           // Prefer the stable Notion page ID. If an API payload omits it, use a
           // row fingerprint instead of treating every missing ID as the same row.
           const key=row.id?`id:${row.id}`:`row:${[row.date,row.shiftTime,row.location,row.gross,row.trips,row.miles,row.helperPaid].join('|')}`;
@@ -208,7 +214,21 @@
           const hoursOf=row=>{if(row.helperHours!==null&&row.helperHours!==undefined&&Number.isFinite(Number(row.helperHours)))return Number(row.helperHours);const m=String(row.shiftTime||'').match(/(\d{1,2}):(\d{2})\s*(am|pm)?\s*[–-]\s*(\d{1,2}):(\d{2})\s*(am|pm)?/i);if(!m)return 0;const mins=(h,mi,suf)=>{let v=Number(h);if(suf){if(suf.toLowerCase()==='pm'&&v<12)v+=12;if(suf.toLowerCase()==='am'&&v===12)v=0;}return v*60+Number(mi)};let a=mins(m[1],m[2],m[3]),b=mins(m[4],m[5],m[6]);if(b<a)b+=1440;return (b-a)/60};
           const hours=rows.reduce((sum,row)=>sum+hoursOf(row),0),gross=rows.reduce((sum,row)=>sum+(Number(row.gross)||0),0),trips=rows.reduce((sum,row)=>sum+(Number(row.trips)||0),0),boost=rows.reduce((sum,row)=>sum+(Number(row.helperBoost)||0),0),fuel=rows.reduce((sum,row)=>sum+(Number(row.miles)||0)*.30,0),earned=rows.reduce((sum,row)=>sum+(Number(row.helperPayout)||0),0),paid=paidRows.reduce((sum,row)=>sum+(Number(row.helperPaid)||0),0),outstanding=rows.reduce((sum,row)=>sum+(row.helperOutstanding!=null?Number(row.helperOutstanding):Math.max(0,(Number(row.helperPayout)||0)-(Number(row.helperPaid)||0))),0);
           const fmtDate=(value,year=false)=>new Date(value+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',...(year?{year:'numeric'}:{}),timeZone:'UTC'});
-          set('week-dates',`${fmtDate(start)} – ${fmtDate(end,true)}`);set('week-shifts',rows.length);set('week-hours',hoursText(hours));set('week-earned',money(earned));set('week-paid',money(paid));set('week-outstanding',money(outstanding));set('week-caption',rows.length?'Totals are based on helper earnings records for the selected week.':'No helper earnings recorded for this week.');
+          // The current-week summary must use the backend's established currentWeek
+          // rollup. It is the same live calculation used by the previously working
+          // dashboard and does not depend on weeklyRows being complete.
+          if(start===currentStart){
+            const currentEnd=w.weekEnd||end;
+            set('week-dates',w.weekStart&&w.weekEnd?`${fmtDate(w.weekStart)} – ${fmtDate(currentEnd,true)}`:`${fmtDate(start)} – ${fmtDate(end,true)}`);
+            set('week-shifts',w.shiftCount??rows.length);
+            set('week-hours',w.hours==null?hoursText(hours):hoursText(w.hours));
+            set('week-earned',w.earned==null?money(earned):money(w.earned));
+            set('week-paid',w.paid==null?money(paid):money(w.paid));
+            set('week-outstanding',w.outstanding==null?money(outstanding):money(w.outstanding));
+            set('week-caption',w.caption||'Current-week totals from the live Earnings Log rollup.');
+          }else{
+            set('week-dates',`${fmtDate(start)} – ${fmtDate(end,true)}`);set('week-shifts',rows.length);set('week-hours',hoursText(hours));set('week-earned',money(earned));set('week-paid',money(paid));set('week-outstanding',money(outstanding));set('week-caption',rows.length?'Totals are based on helper earnings records for the selected week.':'No helper earnings recorded for this week.');
+          }
           set('weekly-breakdown-dates',`${fmtDate(start)} – ${fmtDate(end,true)}`);set('wb-average-shift',rows.length?money(gross/rows.length):'—');set('wb-hourly',hours>0?money(gross/hours):'—');set('wb-trips',trips);set('wb-trips-hour',hours>0?(trips/hours).toFixed(1):'—');set('wb-gross',money(gross));set('wb-fuel',money(fuel));set('wb-boost',money(boost));set('wb-unpaid',rows.filter(row=>!(Number(row.helperPaid)>0)).length);
         }
         if(picker){picker.value=currentStart;renderSelectedWeek(currentStart);}else{set('week-dates',w.weekStart&&w.weekEnd?`${new Date(w.weekStart+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'})} – ${new Date(w.weekEnd+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}`:'Current week');set('week-shifts',w.shiftCount??'—');set('week-hours',hoursText(w.hours));set('week-earned',money(w.earned));set('week-paid',money(w.paid));set('week-outstanding',money(w.outstanding));set('week-caption',w.caption||'Weekly totals calculated from completed helper earnings records.');}

@@ -1,437 +1,824 @@
+// Helper dashboard payload for /api/dashboard-data.
+// Outstanding balance is read only from the Helper Pay Summary rollup.
+// A failed or missing rollup stays null with outstandingSyncError — never £0,
+// and never a sum of Earnings Log rows. Earnings, shifts and the summary fail
+// independently. Stale September records are never returned.
+
 const STORE_NAME = 'helper-dashboard-data';
 const KEY = 'current';
-const NOTION_DATA_SOURCE_ID = process.env.NOTION_EARNINGS_DATA_SOURCE_ID || '46678020-e282-4699-96bc-c4db27d3af56';
-const NOTION_DASHBOARD_PAGE_ID = process.env.NOTION_DASHBOARD_PAGE_ID || 'c5ea7d91-f11c-4e2d-9822-b98b0d42bcf5';
-const NOTION_SHIFTS_DATA_SOURCE_ID = process.env.NOTION_SHIFTS_DATA_SOURCE_ID || '5f05970c-fcc0-497b-aa62-3e8edefbbb2b';
-const NOTION_HELPER_PAY_SUMMARY_PAGE_ID = (process.env.NOTION_HELPER_PAY_SUMMARY_PAGE_ID || '3f9f475c-d2eb-81ae-812f-e65f142fc1c1').replace(/-/g, '');
 
-const DEFAULT_DATA = {
-  version: 3,
-  updatedAt: '',
-  nextShift: { date: '', day: 'No upcoming helper shift', location: 'No confirmed helper shift', start: '', end: '', status: 'No upcoming helper shift', responseDeadline: '', finalConfirmation: '', targetGross: null, targetTrips: null, estimatedHelperPay: null, plannedHours: null, quest: 'No upcoming confirmed Quest shift' },
-  recentShift: null,
-  latestPayment: null,
-  trendDemand: { title: 'Trend & demand', summary: 'No new trend/demand graphic has been recorded for the current shift.', imageData: '', updatedAt: '' },
-  currentWeek: { caption: 'Waiting for live weekly data.' }
+const NOTION_EARNINGS_ID =
+  process.env.NOTION_EARNINGS_DATA_SOURCE_ID ||
+  '46678020-e282-4699-96bc-c4db27d3af56';
+
+const NOTION_SHIFTS_ID =
+  process.env.NOTION_SHIFTS_DATA_SOURCE_ID ||
+  process.env.NOTION_WORK_PLANNER_DATA_SOURCE_ID ||
+  '5f05970c-fcc0-497b-aa62-3e8edefbbb2b';
+
+const NOTION_HELPER_SUMMARY_PAGE_ID =
+  process.env.NOTION_HELPER_PAY_SUMMARY_PAGE_ID ||
+  '3f9f475c-d2eb-81ae-812f-e65f142fc1c1';
+
+const NOTION_OUTSTANDING_DATA_SOURCE_ID =
+  process.env.NOTION_OUTSTANDING_DATA_SOURCE_ID ||
+  '04ae34cf-2938-40ab-91c5-d917e76b297a';
+
+const NOTION_DASHBOARD_PAGE_ID =
+  process.env.NOTION_DASHBOARD_PAGE_ID ||
+  'c5ea7d91-f11c-4e2d-9822-b98b0d42bcf5';
+
+const OUTSTANDING_NAMES = [
+  'Total outstanding (£)',
+  'Total outstanding',
+  'Outstanding (£)',
+  'Outstanding'
+];
+
+const TREND_DEMAND = {
+  title: 'Trend & demand',
+  summary: 'No new trend/demand graphic has been recorded for the current shift.',
+  imageData: '',
+  updatedAt: ''
 };
 
-function money(n) { return Number.isFinite(Number(n)) ? Number(n) : 0; }
+function roundMoney(value) {
+  return Math.round(Number(value) * 100) / 100;
+}
+
+function dateOnly(value) {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
 function propNumber(props, name) {
-  const p = props?.[name];
-  if (!p) return null;
-  if (p.type === 'number') return p.number == null ? null : Number(p.number);
-  if (p.type === 'rollup') {
-    const r = p.rollup;
-    if (r?.type === 'number') return r.number == null ? null : Number(r.number);
-    if (r?.type === 'array' && Array.isArray(r.array)) {
-      return r.array.reduce((sum, item) => sum + Number(item?.number ?? item?.formula?.number ?? 0), 0);
+  const property = props?.[name];
+  if (!property) return null;
+  if (property.type === 'number') {
+    return property.number == null ? null : Number(property.number);
+  }
+  if (property.type === 'formula') {
+    const formula = property.formula;
+    if (formula?.type === 'number') {
+      return formula.number == null ? null : Number(formula.number);
+    }
+    return null;
+  }
+  if (property.type === 'rollup') return rollupNumber(property.rollup);
+  return null;
+}
+
+function rollupNumber(rollup) {
+  if (!rollup) return null;
+  if (rollup.type === 'number') {
+    return rollup.number == null ? null : Number(rollup.number);
+  }
+  if (rollup.type !== 'array' || !Array.isArray(rollup.array)) return null;
+  if (rollup.array.length === 0) return null;
+  const numbers = rollup.array.map(item => {
+    if (item?.type === 'number') {
+      return item.number == null ? null : Number(item.number);
+    }
+    if (item?.type === 'formula' && item.formula?.type === 'number') {
+      return item.formula.number == null ? null : Number(item.formula.number);
+    }
+    return null;
+  });
+  if (numbers.some(value => value == null || !Number.isFinite(value))) return null;
+  return numbers.reduce((sum, value) => sum + value, 0);
+}
+
+function readOutstandingValue(props) {
+  if (!props) return null;
+  for (const name of OUTSTANDING_NAMES) {
+    if (Object.prototype.hasOwnProperty.call(props, name)) {
+      const value = propNumber(props, name);
+      if (value !== null) return value;
     }
   }
-  if (p.type === 'formula') {
-    const f = p.formula;
-    if (f?.type === 'number') return f.number == null ? null : Number(f.number);
-  }
-  return null;
+  const fallbackName = Object.keys(props).find(name => /total outstanding/i.test(name));
+  if (!fallbackName) return null;
+  return propNumber(props, fallbackName);
 }
-function firstNumber(props, names) {
-  for (const name of names) {
-    const value = propNumber(props, name);
-    if (value !== null) return value;
-  }
-  return null;
-}
+
 function propDate(props, name) {
-  const p = props?.[name];
-  return p?.type === 'date' ? (p.date?.start || null) : null;
+  const property = props?.[name];
+  if (property?.type !== 'date') return null;
+  return dateOnly(property.date?.start);
 }
+
 function propTitle(props, name) {
-  const p = props?.[name];
-  if (p?.type === 'title') return (p.title || []).map(x => x.plain_text || '').join('').trim();
-  return '';
+  const property = props?.[name];
+  if (property?.type !== 'title') return '';
+  return (property.title || []).map(part => part.plain_text || '').join('').trim();
 }
-function propText(props, name) {
-  const p = props?.[name];
-  if (p?.type === 'rich_text') return (p.rich_text || []).map(x => x.plain_text || '').join('').trim();
+
+function pageTitle(page) {
+  const props = page?.properties || {};
+  for (const property of Object.values(props)) {
+    if (property?.type === 'title') {
+      return (property.title || []).map(part => part.plain_text || '').join('').trim();
+    }
+  }
   return '';
 }
 
-async function notionChildren(blockId) {
-  const token = process.env.NOTION_TOKEN;
-  if (!token) throw new Error('NOTION_TOKEN is not configured');
-  const all = [];
-  let cursor = '';
-  do {
-    const url = new URL(`https://api.notion.com/v1/blocks/${blockId}/children`);
-    url.searchParams.set('page_size', '100');
-    if (cursor) url.searchParams.set('start_cursor', cursor);
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}`, 'Notion-Version': '2022-06-28' }
-    });
-    if (!response.ok) throw new Error(`Notion blocks ${response.status}`);
-    const data = await response.json();
-    all.push(...(data.results || []));
-    cursor = data.has_more ? data.next_cursor : '';
-  } while (cursor);
-  return all;
+function propText(props, name) {
+  const property = props?.[name];
+  if (!property) return '';
+  if (property.type === 'rich_text') {
+    return (property.rich_text || []).map(part => part.plain_text || '').join('').trim();
+  }
+  if (property.type === 'select') return property.select?.name || '';
+  if (property.type === 'status') return property.status?.name || '';
+  if (property.type === 'formula') {
+    const formula = property.formula;
+    if (formula?.type === 'string') return formula.string || '';
+    if (formula?.type === 'number' && formula.number != null) return String(formula.number);
+  }
+  return '';
+}
+
+function propSelect(props, name) {
+  const property = props?.[name];
+  if (property?.type === 'select') return property.select?.name || '';
+  if (property?.type === 'status') return property.status?.name || '';
+  return '';
+}
+
+function propCheckbox(props, name) {
+  return props?.[name]?.type === 'checkbox' && props[name].checkbox === true;
 }
 
 function richTextPlain(items) {
-  return (items || []).map(x => x.plain_text || x.text?.content || '').join('');
+  return (items || []).map(part => part.plain_text || part.text?.content || '').join('');
 }
 
-async function getSyncTestData() {
-  const blocks = await notionChildren(NOTION_DASHBOARD_PAGE_ID);
-  const callout = blocks.find(b => b.type === 'callout' && /SYNC TEST DATA/i.test(richTextPlain(b.callout?.rich_text)));
-  if (!callout) return null;
-  const text = richTextPlain(callout.callout?.rich_text);
-  const owed = text.match(/Currently owed:\s*£?([0-9]+(?:\.[0-9]{1,2})?)/i);
-  const payment = text.match(/Latest payment:\s*£?([0-9]+(?:\.[0-9]{1,2})?)/i);
-  const ref = text.match(/Reference\s+([^·\n]+)/i);
-  const date = text.match(/·\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})/i);
-  if (!owed || !payment) return null;
-  return {
-    currentlyOwed: Number(owed[1]),
-    latestPayment: {
-      amount: Number(payment[1]),
-      reference: (ref?.[1] || 'TEST').trim(),
-      date: (date?.[1] || '').trim(),
-      breakdown: []
-    }
-  };
-}
-
-async function notionSummaryOutstanding() {
-  const token = process.env.NOTION_TOKEN;
-  if (!token) throw new Error('NOTION_TOKEN is not configured');
-  const response = await fetch(`https://api.notion.com/v1/pages/${NOTION_HELPER_PAY_SUMMARY_PAGE_ID}`, {
-    headers: { Authorization: `Bearer ${token}`, 'Notion-Version': '2025-09-03' }
+function displayDate(value) {
+  const day = dateOnly(value);
+  if (!day) return '';
+  return new Date(`${day}T12:00:00Z`).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC'
   });
-  if (!response.ok) throw new Error(`Notion Helper Pay Summary ${response.status}: ${await response.text()}`);
-  const page = await response.json();
-  const p = page.properties?.['Total outstanding (£)'];
-  if (!p || p.type !== 'rollup' || p.rollup?.type !== 'number' || typeof p.rollup.number !== 'number') {
-    throw new Error('Helper Pay Summary Total outstanding (£) rollup is missing or not numeric');
-  }
-  return Math.round(p.rollup.number * 100) / 100;
 }
 
-async function notionQueryAll() {
-  const token = process.env.NOTION_TOKEN;
-  if (!token) throw new Error('NOTION_TOKEN is not configured');
-  const all = [];
-  let cursor;
-  do {
-    const response = await fetch(`https://api.notion.com/v1/data_sources/${NOTION_DATA_SOURCE_ID}/query`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Notion-Version': '2025-09-03',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        page_size: 100,
-        sorts: [{ property: 'Date', direction: 'descending' }],
-        ...(cursor ? { start_cursor: cursor } : {})
-      })
-    });
-    if (!response.ok) throw new Error(`Notion data source query ${response.status}: ${await response.text()}`);
-    const data = await response.json();
-    all.push(...(data.results || []));
-    cursor = data.has_more ? data.next_cursor : null;
-  } while (cursor);
-  return all;
+function weekdayDate(value) {
+  const day = dateOnly(value);
+  if (!day) return '';
+  return new Date(`${day}T12:00:00Z`).toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'UTC'
+  });
 }
 
 function durationText(hours) {
   if (!Number.isFinite(hours)) return '';
   const mins = Math.round(hours * 60);
-  const h = Math.floor(mins / 60), m = mins % 60;
-  return h ? `${h}h${m ? ` ${m}m` : ''}` : `${m}m`;
+  const wholeHours = Math.floor(mins / 60);
+  const remainder = mins % 60;
+  return wholeHours ? `${wholeHours}h${remainder ? ` ${remainder}m` : ''}` : `${remainder}m`;
 }
-function displayDate(value) {
-  if (!value) return '';
-  return new Date(`${value}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
-}
+
 function extractTime(notes) {
-  const m = String(notes || '').match(/(\d{1,2}:\d{2})[–-](\d{1,2}:\d{2})/);
-  return m ? `${m[1]}–${m[2]}` : '';
+  const match = String(notes || '').match(
+    /(\d{1,2}:\d{2}\s*(?:am|pm)?)\s*[–-]\s*(\d{1,2}:\d{2}\s*(?:am|pm)?)/i
+  );
+  if (!match) return '';
+  return `${match[1].replace(/\s+/g, '')}–${match[2].replace(/\s+/g, '')}`;
 }
 
-
-function propSelect(props, name) {
-  const p = props?.[name];
-  // Notion database properties may be configured as either Select or Status.
-  if (p?.type === 'select') return p.select?.name || '';
-  if (p?.type === 'status') return p.status?.name || '';
-  return '';
-}
-function ukISODate(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date);
-  const part = type => parts.find(x => x.type === type)?.value || '';
-  return `${part('year')}-${part('month')}-${part('day')}`;
-}
-function propCheckbox(props, name) {
-  const p = props?.[name];
-  return p?.type === 'checkbox' && p.checkbox === true;
-}
-function propFormulaText(props, name) {
-  const p = props?.[name];
-  if (p?.type !== 'formula') return '';
-  const f = p.formula;
-  if (f?.type === 'string') return f.string || '';
-  if (f?.type === 'number') return f.number == null ? '' : String(f.number);
-  return '';
-}
-async function notionQuerySource(sourceId, sortProperty = 'Date', direction = 'ascending') {
-  const token = process.env.NOTION_TOKEN;
-  if (!token) throw new Error('NOTION_TOKEN is not configured');
-  const all = [];
-  let cursor;
-  do {
-    const response = await fetch(`https://api.notion.com/v1/data_sources/${sourceId}/query`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Notion-Version': '2025-09-03',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        page_size: 100,
-        sorts: [{ property: sortProperty, direction }],
-        ...(cursor ? { start_cursor: cursor } : {})
-      })
-    });
-    if (!response.ok) throw new Error(`Notion data source ${sourceId} query ${response.status}`);
-    const data = await response.json();
-    all.push(...(data.results || []));
-    cursor = data.has_more ? data.next_cursor : null;
-  } while (cursor);
-  return all;
-}
 function formatClock(value) {
-  if (!value) return '';
-  const m = String(value).match(/^(\d{1,2}):(\d{2})$/);
-  if (!m) return value;
-  const h = Number(m[1]), mins = m[2];
-  const suffix = h >= 12 ? 'pm' : 'am';
-  const displayHour = h % 12 || 12;
-  return `${displayHour}:${mins === '00' ? '00' : mins}${suffix}`;
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/[ap]m$/i.test(raw)) return raw.replace(/\s+/g, '').replace(/AM$/i, 'am').replace(/PM$/i, 'pm');
+  const match = raw.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return raw;
+  const hour = Number(match[1]);
+  const suffix = hour >= 12 ? 'pm' : 'am';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${match[2]}${suffix}`;
 }
-function hoursFromWindow(value) {
-  const m = String(value || '').match(/(\d{1,2}):(\d{2})\s*[–-]\s*(\d{1,2}):(\d{2})/);
-  if (!m) {
-    const h = String(value || '').match(/(\d+(?:\.\d+)?)\s*hours?/i);
-    return h ? Number(h[1]) : 0;
+
+function toMinutes(hourText, minuteText, suffix) {
+  let hour = Number(hourText);
+  const minute = Number(minuteText);
+  if (suffix) {
+    const marker = suffix.toLowerCase();
+    if (marker === 'pm' && hour < 12) hour += 12;
+    if (marker === 'am' && hour === 12) hour = 0;
   }
-  let start = Number(m[1]) * 60 + Number(m[2]);
-  let end = Number(m[3]) * 60 + Number(m[4]);
+  return hour * 60 + minute;
+}
+
+function hoursFromWindow(value) {
+  const match = String(value || '').match(
+    /(\d{1,2}):(\d{2})\s*(am|pm)?\s*[–-]\s*(\d{1,2}):(\d{2})\s*(am|pm)?/i
+  );
+  if (!match) {
+    const hours = String(value || '').match(/(\d+(?:\.\d+)?)\s*hours?/i);
+    return hours ? Number(hours[1]) : null;
+  }
+  let start = toMinutes(match[1], match[2], match[3]);
+  let end = toMinutes(match[4], match[5], match[6]);
   if (end < start) end += 24 * 60;
   return Math.round(((end - start) / 60) * 100) / 100;
 }
-function makeLiveNextShift(pages) {
-  const today = ukISODate();
-  const candidates = pages.map(page => {
-    const p = page.properties || {};
-    const date = propDate(p, 'Date');
-    return {
-      date,
-      day: date ? new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : '',
-      title: propTitle(p, 'Shift'),
-      location: propText(p, 'Location'),
-      window: propText(p, 'Window'),
-      status: propSelect(p, 'Status'),
-      crew: propSelect(p, 'Crew'),
-      targetGross: propNumber(p, 'Target Gross'),
-      targetTrips: propNumber(p, 'Trip Target'),
-      estimatedHelperPay: propNumber(p, 'Helper Pay'),
-      quest: propCheckbox(p, 'Quest') ? 'Confirmed' : 'Not currently confirmed',
-      completed: propCheckbox(p, 'Completed')
-    };
-  }).filter(s => s.date && s.date >= today && !s.completed &&
-    ['Confirmed', 'Live'].includes(s.status) &&
-    (!s.crew || s.crew === 'With helper'));
-  const priority = { Live: 0, Confirmed: 1 };
-  candidates.sort((a, b) => a.date.localeCompare(b.date) ||
-    (priority[a.status] ?? 9) - (priority[b.status] ?? 9));
-  const s = candidates[0];
-  if (!s) return {
-    date: '', day: 'No upcoming helper shift', location: 'No confirmed helper shift',
-    start: '', end: '', status: 'No upcoming helper shift', responseDeadline: '',
-    finalConfirmation: '', targetGross: null, targetTrips: null, estimatedHelperPay: null,
-    plannedHours: null, quest: 'No upcoming confirmed Quest shift'
-  };
-  const m = String(s.window || s.title).match(/(\d{1,2}:\d{2})\s*[–-]\s*(\d{1,2}:\d{2})/);
+
+function clockWindow(value) {
+  const match = String(value || '').match(
+    /(\d{1,2}:\d{2}\s*(?:am|pm)?)\s*[–-]\s*(\d{1,2}:\d{2}\s*(?:am|pm)?)/i
+  );
+  if (!match) return { start: '', end: '' };
   return {
-    date: s.date, day: s.day, location: s.location || s.title, start: m ? formatClock(m[1]) : '',
-    end: m ? formatClock(m[2]) : '', status: s.status, responseDeadline: '',
-    finalConfirmation: '', targetGross: s.targetGross || 0, targetTrips: s.targetTrips || 0,
-    estimatedHelperPay: s.estimatedHelperPay || 0, plannedHours: hoursFromWindow(s.window),
-    quest: s.quest
+    start: formatClock(match[1]),
+    end: formatClock(match[2])
   };
 }
 
-function makeLiveUpcomingShifts(pages) {
-  const today = ukISODate();
-  const rows = pages.map(page => {
-    const p = page.properties || {};
-    const date = propDate(p, 'Date');
-    return {
-      date,
-      day: date ? new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }) : '',
-      title: propTitle(p, 'Shift'),
-      location: propText(p, 'Location'),
-      window: propText(p, 'Window'),
-      status: propSelect(p, 'Status'),
-      crew: propSelect(p, 'Crew'),
-      targetGross: propNumber(p, 'Target Gross'),
-      targetTrips: propNumber(p, 'Trip Target'),
-      estimatedHelperPay: propNumber(p, 'Helper Pay'),
-      quest: propCheckbox(p, 'Quest'),
-      completed: propCheckbox(p, 'Completed')
-    };
-  }).filter(s => s.date && s.date >= today && !s.completed &&
-    ['Confirmed', 'Live'].includes(s.status) && (!s.crew || s.crew === 'With helper'));
-  const priority = { Live: 0, Confirmed: 1 };
-  return rows.sort((a, b) => a.date.localeCompare(b.date) ||
-    (priority[a.status] ?? 9) - (priority[b.status] ?? 9)).slice(0, 10);
+function emptyNextShift() {
+  return {
+    date: '',
+    day: 'No upcoming helper shift',
+    location: 'No confirmed helper shift',
+    start: '',
+    end: '',
+    status: 'No upcoming helper shift',
+    responseDeadline: '',
+    finalConfirmation: '',
+    targetGross: null,
+    targetTrips: null,
+    estimatedHelperPay: null,
+    plannedHours: null,
+    quest: 'No upcoming confirmed Quest shift'
+  };
 }
 
-async function getNotionData(base) {
-  const [pages, shiftResult, summaryOutstanding] = await Promise.all([
-    notionQueryAll(),
-    notionSummaryOutstanding(),
-    notionQuerySource(NOTION_SHIFTS_DATA_SOURCE_ID, 'Date', 'ascending')
-      .then(pages => ({ pages, error: false }))
-      .catch(error => {
-        console.error('Notion live-shifts sync failed', error?.message || error);
-        return { pages: [], error: true };
-      })
-  ]);
-  const shiftPages = shiftResult.pages;
-  const rows = pages.map(page => {
-    const p = page.properties || {};
-    return {
-      page,
-      day: propTitle(p, 'Day'),
-      date: propDate(p, 'Date'),
-      paidDate: propDate(p, 'Date paid'),
-      gross: propNumber(p, 'Gross (£)') || 0,
-      miles: propNumber(p, 'Miles') || 0,
-      trips: propNumber(p, 'Trips/deliveries') || 0,
-      withHelper: p['With helper']?.checkbox === true,
-      helperPaid: propNumber(p, 'Helper paid (£)') || 0,
-      helperOutstanding: propNumber(p, 'Helper outstanding (£)'),
-      helperPayout: propNumber(p, 'Helper payout (£)'),
-      helperBoost: firstNumber(p, ['Helper boost (£)', 'Trip boost (£)', 'Trip Boost (£)', 'Helper Trip Boost (£)', 'Trip boost']),
-      paymentRef: propNumber(p, 'Payment ref'),
-      helperHours: propNumber(p, 'Helper hours'),
-      notes: propText(p, 'Notes'),
-      shiftTime: propText(p, 'Shift time'),
-      shiftDuration: propText(p, 'Shift duration')
-    };
-  });
+function shiftUnavailable() {
+  return {
+    ...emptyNextShift(),
+    day: 'Unable to load shift data',
+    location: 'Work Planner could not be read',
+    status: 'Shift sync unavailable',
+    quest: 'Unavailable'
+  };
+}
 
-  const helperRows = rows.filter(r => r.withHelper);
-  const owed = helperRows.reduce((sum, r) => sum + (r.helperOutstanding ?? Math.max(0, (r.helperPayout || 0) - (r.helperPaid || 0))), 0);
+function unavailablePayload(now = new Date()) {
+  return {
+    version: 3,
+    updatedAt: now.toISOString(),
+    dataUnavailable: true,
+    dataError: 'Live Notion data could not be loaded.',
+    syncError: true,
+    syncErrorMessage: 'Live Notion data could not be loaded.',
+    nextShift: {
+      date: '',
+      day: 'Live data unavailable',
+      location: 'Unable to load shift data',
+      start: '',
+      end: '',
+      status: 'Connection unavailable',
+      responseDeadline: '',
+      finalConfirmation: '',
+      targetGross: null,
+      targetTrips: null,
+      estimatedHelperPay: null,
+      plannedHours: null,
+      quest: 'Unavailable'
+    },
+    recentShift: null,
+    latestPayment: null,
+    currentlyOwed: null,
+    outstandingSyncError: true,
+    earningsSyncError: true,
+    shiftSyncError: true,
+    upcomingShifts: [],
+    weeklyRows: [],
+    currentWeek: {
+      weekStart: null,
+      weekEnd: null,
+      shiftCount: null,
+      hours: null,
+      earned: null,
+      paid: null,
+      outstanding: null,
+      caption: 'Live weekly data unavailable'
+    },
+    trendDemand: {
+      title: 'Live data unavailable',
+      summary: 'Connect the Notion data sources to display current information.',
+      imageData: '',
+      updatedAt: ''
+    },
+    syncTestActive: false,
+    tripBoost: null,
+    sync: { source: 'notion', syncedAt: null }
+  };
+}
 
-  const paidRows = helperRows.filter(r => r.paidDate && r.paymentRef != null && (r.helperPaid || 0) > 0);
-  let latestPayment = { amount: null, reference: '', date: '', breakdown: [] };
-  if (paidRows.length) {
-    const latestDate = paidRows.map(r => r.paidDate).sort().at(-1);
-    const latestRef = paidRows.filter(r => r.paidDate === latestDate).map(r => r.paymentRef).sort((a,b) => a-b).at(-1);
-    const paymentRows = paidRows.filter(r => r.paidDate === latestDate && r.paymentRef === latestRef);
-    const amount = paymentRows.reduce((sum, r) => sum + (r.helperPaid || 0), 0);
-    latestPayment = {
-      amount: Math.round(amount * 100) / 100,
-      reference: String(latestRef),
-      date: displayDate(latestDate),
-      breakdown: paymentRows.slice().sort((a,b) => String(a.date).localeCompare(String(b.date))).map(r => ({
-        label: r.day.replace(/^.*?—\s*/, '').replace(/\s+(?:helper|evening|afternoon|morning).*$/i, '') || r.day,
-        detail: `${r.shiftTime || extractTime(r.notes)}${(r.shiftTime || extractTime(r.notes)) ? ' · ' : ''}£${(r.helperPaid || 0).toFixed(2)}`
-      }))
-    };
-    // Prefer the actual day title for the two current payment rows.
-    latestPayment.breakdown = paymentRows.map(r => ({
-      label: r.day.replace(/\s+—\s+.*$/, ''),
-      detail: `${r.shiftTime || extractTime(r.notes)}${(r.shiftTime || extractTime(r.notes)) ? ' · ' : ''}£${(r.helperPaid || 0).toFixed(2)}`
-    }));
+function mapShiftPage(page) {
+  const props = page?.properties || {};
+  const date = propDate(props, 'Date');
+  const windowText = propText(props, 'Window');
+  return {
+    date,
+    day: date ? weekdayDate(date) : '',
+    title: propTitle(props, 'Shift'),
+    location: propText(props, 'Location'),
+    window: windowText,
+    status: propSelect(props, 'Status'),
+    crew: propSelect(props, 'Crew'),
+    targetGross: propNumber(props, 'Target Gross'),
+    targetTrips: propNumber(props, 'Trip Target'),
+    estimatedHelperPay: propNumber(props, 'Helper Pay'),
+    quest: propCheckbox(props, 'Quest'),
+    completed: propCheckbox(props, 'Completed')
+  };
+}
+
+function isUpcomingHelperShift(shift, today) {
+  return Boolean(shift.date) &&
+    shift.date >= today &&
+    !shift.completed &&
+    (shift.status === 'Confirmed' || shift.status === 'Live') &&
+    (!shift.crew || shift.crew === 'With helper');
+}
+
+function sortShifts(shifts) {
+  const priority = { Live: 0, Confirmed: 1 };
+  return shifts.slice().sort((a, b) =>
+    a.date.localeCompare(b.date) ||
+    (priority[a.status] ?? 9) - (priority[b.status] ?? 9)
+  );
+}
+
+function makeLiveNextShift(pages, today) {
+  const upcoming = sortShifts(
+    (pages || []).map(mapShiftPage).filter(shift => isUpcomingHelperShift(shift, today))
+  );
+  const shift = upcoming[0];
+  if (!shift) return emptyNextShift();
+  const times = clockWindow(shift.window || shift.title);
+  return {
+    date: shift.date,
+    day: shift.day,
+    location: shift.location || shift.title,
+    start: times.start,
+    end: times.end,
+    status: shift.status,
+    responseDeadline: '',
+    finalConfirmation: '',
+    targetGross: shift.targetGross,
+    targetTrips: shift.targetTrips,
+    estimatedHelperPay: shift.estimatedHelperPay,
+    plannedHours: hoursFromWindow(shift.window),
+    quest: shift.quest ? 'Confirmed' : 'Not currently confirmed'
+  };
+}
+
+function makeLiveUpcomingShifts(pages, today) {
+  return sortShifts(
+    (pages || []).map(mapShiftPage).filter(shift => isUpcomingHelperShift(shift, today))
+  ).slice(0, 10);
+}
+
+function mapEarningsPage(page) {
+  const props = page?.properties || {};
+  return {
+    id: page?.id || null,
+    day: propTitle(props, 'Day'),
+    date: propDate(props, 'Date'),
+    paidDate: propDate(props, 'Date paid'),
+    gross: propNumber(props, 'Gross (£)'),
+    miles: propNumber(props, 'Miles'),
+    trips: propNumber(props, 'Trips/deliveries'),
+    withHelper: propCheckbox(props, 'With helper'),
+    helperPaid: propNumber(props, 'Helper paid (£)'),
+    helperOutstanding: propNumber(props, 'Helper outstanding (£)'),
+    helperBoost: propNumber(props, 'Helper boost (£)'),
+    helperPayout: propNumber(props, 'Helper payout (£)'),
+    helperAdjustment: propNumber(props, 'Helper adjustment (£)'),
+    paymentRef: propNumber(props, 'Payment ref'),
+    helperHours: propNumber(props, 'Helper hours'),
+    notes: propText(props, 'Notes'),
+    shiftTime: propText(props, 'Shift time'),
+    shiftDuration: propText(props, 'Shift duration')
+  };
+}
+
+function paymentLabel(day) {
+  const label = String(day || '')
+    .replace(/\s+[—–-]\s+.*$/, '')
+    .trim();
+  return label || 'Payment entry';
+}
+
+function paymentDetail(row) {
+  const time = String(row.shiftTime || extractTime(row.notes) || '').trim();
+  const amount = roundMoney(row.helperPaid).toFixed(2);
+  return time ? `${time} · £${amount}` : `£${amount}`;
+}
+
+function splitTimes(row) {
+  const time = String(row.shiftTime || extractTime(row.notes) || '').trim();
+  const parts = time.split(/\s*[–-]\s*/);
+  return {
+    start: (parts[0] || '').trim(),
+    end: (parts[1] || '').trim()
+  };
+}
+
+function makeLatestPayment(rows) {
+  const paidRows = rows.filter(row =>
+    row.withHelper && row.paidDate && (row.helperPaid || 0) > 0
+  );
+  if (!paidRows.length) {
+    return { amount: null, reference: '', date: '', breakdown: [] };
   }
+  const latestDate = paidRows.map(row => row.paidDate).sort().at(-1);
+  const latestDayRows = paidRows.filter(row => row.paidDate === latestDate);
+  const refs = latestDayRows
+    .map(row => row.paymentRef)
+    .filter(value => value !== null && value !== undefined);
+  const latestRef = refs.length
+    ? refs.slice().sort((a, b) => Number(a) - Number(b)).at(-1)
+    : null;
+  const paymentRows = (latestRef === null
+    ? latestDayRows
+    : latestDayRows.filter(row => String(row.paymentRef) === String(latestRef))
+  ).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+  const amount = paymentRows.reduce((sum, row) => sum + (row.helperPaid || 0), 0);
+  return {
+    amount: roundMoney(amount),
+    reference: latestRef === null ? 'Not recorded' : String(latestRef),
+    date: displayDate(latestDate),
+    breakdown: paymentRows.map(row => ({
+      label: paymentLabel(row.day),
+      detail: paymentDetail(row)
+    }))
+  };
+}
 
-  const recent = helperRows.filter(r => r.date).sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
-  const recentShift = recent ? {
+function makeRecentShift(rows) {
+  const recent = rows
+    .filter(row => row.withHelper && row.date)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+  if (!recent) {
+    return {
+      date: '',
+      day: 'No completed helper shift recorded',
+      location: '',
+      start: '',
+      end: '',
+      gross: null,
+      trips: null,
+      helperTime: '',
+      helperPay: null,
+      helperBoost: null,
+      tripBoost: null
+    };
+  }
+  const times = splitTimes(recent);
+  return {
     date: recent.date,
-    day: new Date(`${recent.date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }),
+    day: weekdayDate(recent.date),
+    location: /Exmouth/i.test(`${recent.notes} ${recent.day}`) ? 'Exmouth' : '',
+    start: times.start,
+    end: times.end,
     gross: recent.gross,
     trips: recent.trips,
-    helperPay: recent.helperPayout != null ? Math.round(recent.helperPayout * 100) / 100 : null,
-    tripBoost: recent.helperBoost != null ? Math.round(recent.helperBoost * 100) / 100 : 0,
     helperTime: recent.shiftDuration || (recent.helperHours != null ? durationText(recent.helperHours) : ''),
-    location: /Exmouth/i.test(recent.notes) ? 'Exmouth' : '',
-    start: (recent.shiftTime || extractTime(recent.notes))?.split(/[–-]/)[0] || '',
-    end: (recent.shiftTime || extractTime(recent.notes))?.split(/[–-]/)[1] || ''
-  } : { date: '', day: 'No completed helper shift recorded', gross: null, trips: null, helperPay: null, tripBoost: null, helperTime: '', location: '', start: '', end: '' };
+    // The completed-shift card shows earned helper pay before separate adjustments
+    // (for example, the £5 mobile deduction). Keep payout/outstanding calculations unchanged.
+    helperPay: recent.helperPayout == null ? null : roundMoney(recent.helperPayout - (recent.helperAdjustment || 0)),
+    // Original Earnings Log rule: Helper boost (£) is the trip boost.
+    // Missing boost data stays null; a recorded zero remains £0. It is not added to helper pay.
+    helperBoost: recent.helperBoost == null ? null : roundMoney(recent.helperBoost),
+    tripBoost: recent.helperBoost == null ? null : roundMoney(recent.helperBoost)
+  };
+}
 
-  const nextShift = makeLiveNextShift(shiftPages);
-  const upcomingShifts = makeLiveUpcomingShifts(shiftPages);
-  const todayUK = ukISODate();
-  const todayParts = todayUK.split('-').map(Number);
-  const todayUtc = new Date(Date.UTC(todayParts[0], todayParts[1] - 1, todayParts[2]));
-  const monday = new Date(todayUtc);
-  const weekday = monday.getUTCDay();
+function ukISODate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/London',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date);
+  const part = type => parts.find(item => item.type === type)?.value || '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
+function currentWeekRange(now) {
+  const [year, month, day] = ukISODate(now).split('-').map(Number);
+  const today = new Date(Date.UTC(year, month - 1, day));
+  const weekday = today.getUTCDay();
+  const monday = new Date(today);
   monday.setUTCDate(monday.getUTCDate() + (weekday === 0 ? -6 : 1 - weekday));
   const sunday = new Date(monday);
   sunday.setUTCDate(sunday.getUTCDate() + 6);
-  const iso = d => d.toISOString().slice(0, 10);
-  const weekStart = iso(monday), weekEnd = iso(sunday);
-  const weekRows = helperRows.filter(r => r.date && r.date >= weekStart && r.date <= weekEnd &&
-    ((r.gross || 0) > 0 || (r.trips || 0) > 0 || (r.helperHours || 0) > 0 ||
-     Boolean(r.shiftDuration) || Boolean(r.shiftTime) || Boolean(extractTime(r.notes))));
-  const weekEarned = weekRows.reduce((sum, r) => sum + (r.helperPayout || 0), 0);
-  const weekPaid = helperRows.filter(r => r.paidDate && r.paidDate >= weekStart && r.paidDate <= weekEnd)
-    .reduce((sum, r) => sum + (r.helperPaid || 0), 0);
-  const weekOutstanding = weekRows.reduce((sum, r) => sum + (r.helperOutstanding ?? Math.max(0, (r.helperPayout || 0) - (r.helperPaid || 0))), 0);
-  const weekHours = weekRows.reduce((sum, r) => sum + (r.helperHours || 0), 0);
-  const weekCaption = `${displayDate(weekStart)}–${displayDate(weekEnd)} · ${weekRows.length} helper shift${weekRows.length === 1 ? '' : 's'} · £${weekEarned.toFixed(2)} earned · £${weekPaid.toFixed(2)} paid this week · £${weekOutstanding.toFixed(2)} outstanding on these shifts`;
-  const currentWeek = { weekStart, weekEnd, shiftCount: weekRows.length, hours: Math.round(weekHours * 100) / 100,
-    earned: Math.round(weekEarned * 100) / 100, paid: Math.round(weekPaid * 100) / 100,
-    outstanding: Math.round(weekOutstanding * 100) / 100, caption: weekCaption };
+  const iso = date => date.toISOString().slice(0, 10);
+  return { weekStart: iso(monday), weekEnd: iso(sunday) };
+}
+
+function makeCurrentWeek(rows, now) {
+  const { weekStart, weekEnd } = currentWeekRange(now);
+  const weekRows = rows.filter(row =>
+    row.withHelper &&
+    row.date &&
+    row.date >= weekStart &&
+    row.date <= weekEnd &&
+    ((row.gross || 0) > 0 || (row.trips || 0) > 0 || (row.helperHours || 0) > 0)
+  );
+  const earned = weekRows.reduce((sum, row) => sum + (row.helperPayout || 0), 0);
+  const paid = rows
+    .filter(row => row.withHelper && row.paidDate && row.paidDate >= weekStart && row.paidDate <= weekEnd)
+    .reduce((sum, row) => sum + (row.helperPaid || 0), 0);
+  const outstanding = weekRows.reduce((sum, row) => sum + (
+    row.helperOutstanding ?? Math.max(0, (row.helperPayout || 0) - (row.helperPaid || 0))
+  ), 0);
+  // Use recorded decimal helper hours where present; otherwise derive duration from the logged shift-time range.
+  // This prevents the weekly total undercounting shifts whose Helper hours property was left blank.
+  const hours = weekRows.reduce((sum, row) => {
+    if (row.helperHours !== null && row.helperHours !== undefined && Number.isFinite(Number(row.helperHours))) {
+      return sum + Number(row.helperHours);
+    }
+    const timeText = String(row.shiftTime || extractTime(row.notes) || '').trim();
+    const parts = timeText.split(/\s*[–-]\s*/);
+    if (parts.length !== 2) return sum;
+    const toMinutes = value => {
+      const match = value.trim().match(/^(\d{1,2}):(\d{2})$/);
+      return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+    };
+    const start = toMinutes(parts[0]);
+    const end = toMinutes(parts[1]);
+    if (start === null || end === null) return sum;
+    const duration = end >= start ? end - start : (24 * 60 - start + end);
+    return sum + duration / 60;
+  }, 0);
+  const shiftCount = weekRows.length;
+  const caption = `${displayDate(weekStart)}–${displayDate(weekEnd)} · ${shiftCount} helper shift${shiftCount === 1 ? '' : 's'} · £${earned.toFixed(2)} earned · £${paid.toFixed(2)} paid this week · £${outstanding.toFixed(2)} outstanding on these shifts`;
   return {
-    ...base,
-    updatedAt: new Date().toISOString(),
-    nextShift,
-    recentShift,
-    latestPayment,
-    currentlyOwed: summaryOutstanding,
-    currentWeek,
-    upcomingShifts,
-    shiftSyncError: shiftResult.error,
-    syncTestActive: false
+    weekStart,
+    weekEnd,
+    shiftCount,
+    hours: roundMoney(hours),
+    earned: roundMoney(earned),
+    paid: roundMoney(paid),
+    outstanding: roundMoney(outstanding),
+    caption
   };
 }
 
-async function getData() {
-  const fallback = DEFAULT_DATA;
-  try { return await getNotionData(fallback); }
-  catch (error) {
-    console.error('Notion dashboard sync failed; live data is unavailable', error?.message || error);
-    return {
-      version: 3,
-      updatedAt: '',
-      dataUnavailable: true,
-      dataError: 'Live Notion data could not be loaded.',
-      nextShift: { date: '', day: 'Live data unavailable', location: 'Unable to load shift data', start: '', end: '', status: 'Connection unavailable', responseDeadline: '', finalConfirmation: '', targetGross: null, targetTrips: null, estimatedHelperPay: null, plannedHours: null, quest: 'Unavailable' },
-      recentShift: null,
-      latestPayment: null,
-      currentlyOwed: null,
-      currentWeek: { caption: 'Live weekly data unavailable', shiftCount: null, hours: null, earned: null, paid: null, outstanding: null },
-      upcomingShifts: [],
-      trendDemand: { title: 'Live data unavailable', summary: 'Connect the Notion data sources to display current information.', imageData: '', updatedAt: '' }
-    };
+export function buildDashboardData({
+  earningsPages = [],
+  shiftPages = [],
+  outstandingValue = null,
+  outstandingError = false,
+  shiftError = false,
+  earningsError = false,
+  syncTestActive = false,
+  now = new Date()
+} = {}) {
+  // Earnings, shifts and helper-pay summary are independent sources. A failed
+  // earnings query must not erase valid shift/summary data or silently look like
+  // a successful empty sync.
+  const rows = (earningsPages || []).map(mapEarningsPage);
+  const today = ukISODate(now);
+  const recentShift = makeRecentShift(rows);
+  const outstandingKnown = !outstandingError && outstandingValue !== null && outstandingValue !== undefined;
+  const currentlyOwed = outstandingKnown ? roundMoney(outstandingValue) : null;
+  return {
+    version: 2,
+    updatedAt: now.toISOString(),
+    nextShift: shiftError ? shiftUnavailable() : makeLiveNextShift(shiftPages, today),
+    recentShift,
+    latestPayment: makeLatestPayment(rows),
+    currentlyOwed,
+    outstandingSyncError: !outstandingKnown,
+    currentWeek: makeCurrentWeek(rows, now),
+    weeklyRows: rows.filter(row => row.withHelper && row.date).map(row => ({
+      id: row.id,
+      date: row.date,
+      paidDate: row.paidDate,
+      gross: row.gross,
+      miles: row.miles,
+      trips: row.trips,
+      helperPaid: row.helperPaid,
+      helperOutstanding: row.helperOutstanding,
+      helperBoost: row.helperBoost,
+      helperPayout: row.helperPayout,
+      helperHours: row.helperHours,
+      shiftTime: row.shiftTime || extractTime(row.notes),
+      withHelper: row.withHelper
+    })),
+    upcomingShifts: shiftError ? [] : makeLiveUpcomingShifts(shiftPages, today),
+    shiftSyncError: Boolean(shiftError),
+    earningsSyncError: Boolean(earningsError),
+    syncError: Boolean(earningsError || shiftError || outstandingError),
+    syncErrorMessage: earningsError
+      ? 'Earnings Log could not be read from Notion. Check that the integration used by NOTION_TOKEN has access to the Earnings log data source.'
+      : (shiftError
+        ? 'Work Planner could not be read from Notion. Check the integration access to the Work Planner data source.'
+        : (outstandingError ? 'Helper Pay Summary could not be read from Notion.' : '')),
+    syncTestActive: Boolean(syncTestActive),
+    tripBoost: recentShift?.tripBoost ?? null,
+    trendDemand: TREND_DEMAND,
+    sync: { source: 'notion', syncedAt: now.toISOString() }
+  };
+}
+
+function notionHeaders() {
+  const token = process.env.NOTION_TOKEN;
+  if (!token) throw new Error('NOTION_TOKEN is not configured');
+  return {
+    Authorization: `Bearer ${token}`,
+    'Notion-Version': '2025-09-03',
+    'Content-Type': 'application/json'
+  };
+}
+
+async function notionRequest(url, options = {}, fetchImpl = fetch) {
+  const response = await fetchImpl(url, {
+    ...options,
+    headers: {
+      ...notionHeaders(),
+      ...(options.headers || {})
+    }
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Notion API ${response.status}: ${body.slice(0, 180)}`);
+  }
+  return response.json();
+}
+
+async function queryDataSource(dataSourceId, sort, fetchImpl) {
+  const load = async sortProperty => {
+    const results = [];
+    let cursor = null;
+    do {
+      const data = await notionRequest(
+        `https://api.notion.com/v1/data_sources/${dataSourceId}/query`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            page_size: 100,
+            ...(sortProperty ? { sorts: [{ property: sortProperty, direction: 'descending' }] } : {}),
+            ...(cursor ? { start_cursor: cursor } : {})
+          })
+        },
+        fetchImpl
+      );
+      results.push(...(data.results || []));
+      cursor = data.has_more ? data.next_cursor : null;
+    } while (cursor);
+    return results;
+  };
+  try {
+    return await load(sort || null);
+  } catch (error) {
+    if (sort && /Notion API 400/.test(error?.message || '')) {
+      console.error('Notion query sort failed; retrying unsorted', error.message);
+      return load(null);
+    }
+    throw error;
   }
 }
 
-export default async (req) => {
-  if (req.method === 'GET') return Response.json(await getData(), { headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' } });
-  return new Response('Method not allowed', { status: 405 });
+async function getPageBlocks(pageId, fetchImpl) {
+  const results = [];
+  let cursor = null;
+  do {
+    const url = new URL(`https://api.notion.com/v1/blocks/${pageId}/children`);
+    url.searchParams.set('page_size', '100');
+    if (cursor) url.searchParams.set('start_cursor', cursor);
+    const data = await notionRequest(url.toString(), {}, fetchImpl);
+    results.push(...(data.results || []));
+    cursor = data.has_more ? data.next_cursor : null;
+  } while (cursor);
+  return results;
+}
+
+async function getSyncTestActive(fetchImpl) {
+  try {
+    const blocks = await getPageBlocks(NOTION_DASHBOARD_PAGE_ID, fetchImpl);
+    const callout = blocks.find(block =>
+      block.type === 'callout' &&
+      /SYNC TEST DATA/i.test(richTextPlain(block.callout?.rich_text))
+    );
+    return Boolean(callout);
+  } catch (error) {
+    console.error('Sync-test callout read failed', error?.message || error);
+    return false;
+  }
+}
+
+async function readHelperSummaryOutstanding(fetchImpl) {
+  try {
+    const page = await notionRequest(
+      `https://api.notion.com/v1/pages/${NOTION_HELPER_SUMMARY_PAGE_ID}`,
+      {},
+      fetchImpl
+    );
+    const value = readOutstandingValue(page.properties || {});
+    if (value !== null) return { outstandingValue: value, outstandingError: false };
+    console.error('Helper Pay Summary page did not contain a readable outstanding rollup');
+  } catch (error) {
+    console.error('Helper Pay Summary page read failed', error?.message || error);
+  }
+
+  try {
+    const pages = await queryDataSource(NOTION_OUTSTANDING_DATA_SOURCE_ID, null, fetchImpl);
+    const match = pages.find(page => /current helper outstanding/i.test(pageTitle(page)));
+    const chosen = match || (pages.length === 1 ? pages[0] : null);
+    if (!chosen) {
+      console.error('Helper Pay Summary rollup row was not found');
+      return { outstandingValue: null, outstandingError: true };
+    }
+    const value = readOutstandingValue(chosen.properties || {});
+    if (value === null) {
+      console.error('Helper Pay Summary rollup value was missing');
+      return { outstandingValue: null, outstandingError: true };
+    }
+    return { outstandingValue: value, outstandingError: false };
+  } catch (error) {
+    console.error('Helper Pay Summary rollup query failed', error?.message || error);
+    return { outstandingValue: null, outstandingError: true };
+  }
+}
+
+async function persistDashboard(payload) {
+  try {
+    const { getStore } = await import('@netlify/blobs');
+    const store = getStore(STORE_NAME, { consistency: 'strong' });
+    if (typeof store.setJSON === 'function') await store.setJSON(KEY, payload);
+    else await store.set(KEY, JSON.stringify(payload));
+  } catch (error) {
+    console.error('Dashboard blob persist skipped', error?.message || error);
+  }
+}
+
+export async function loadLiveDashboard(options = {}) {
+  const fetchImpl = options.fetchImpl || fetch;
+  const now = options.now || new Date();
+  try {
+    const [earningsResult, shiftResult, outstandingResult, syncTestActive] = await Promise.all([
+      queryDataSource(NOTION_EARNINGS_ID, 'Date', fetchImpl)
+        .then(pages => ({ pages, error: false }))
+        .catch(error => {
+          console.error('Earnings Log sync failed', error?.message || error);
+          return { pages: [], error: true };
+        }),
+      queryDataSource(NOTION_SHIFTS_ID, 'Date', fetchImpl)
+        .then(pages => ({ pages, error: false }))
+        .catch(error => {
+          console.error('Work Planner sync failed', error?.message || error);
+          return { pages: [], error: true };
+        }),
+      readHelperSummaryOutstanding(fetchImpl),
+      getSyncTestActive(fetchImpl)
+    ]);
+
+    const payload = buildDashboardData({
+      earningsPages: earningsResult.pages,
+      shiftPages: shiftResult.pages,
+      outstandingValue: outstandingResult.outstandingValue,
+      outstandingError: outstandingResult.outstandingError,
+      shiftError: shiftResult.error,
+      earningsError: earningsResult.error,
+      syncTestActive,
+      now
+    });
+
+    if (!payload.dataUnavailable && !options.skipPersist) await persistDashboard(payload);
+    return payload;
+  } catch (error) {
+    console.error('Notion dashboard sync failed', error?.message || error);
+    return unavailablePayload(now);
+  }
+}
+
+export default async function dashboardData(req) {
+  if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 });
+  return Response.json(await loadLiveDashboard(), {
+    headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+  });
+}
+
+export const config = {
+  path: '/api/dashboard-data',
+  method: ['GET']
 };
-export const config = { path: '/api/dashboard-data', method: ['GET'] };
+
+export const __test = {
+  propNumber,
+  readOutstandingValue,
+  rollupNumber,
+  emptyNextShift
+};
