@@ -9,8 +9,8 @@
 <meta content="no-cache" http-equiv="Pragma"/>
 <meta content="0" http-equiv="Expires"/>
 <meta content="Helper shifts, availability and pay progress in one place." name="description"/>
-<link rel="icon" type="image/png" href="/api/dashboard-image?slot=dashboard-logo"/>
-<link rel="apple-touch-icon" href="/api/dashboard-image?slot=dashboard-logo"/>
+<link rel="icon" type="image/png" sizes="192x192" href="/icons/gqs-icon-192.png"/>
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"/>
 <link rel="manifest" href="/manifest.webmanifest"/>
 <title>Helper Dashboard</title>
 <style>
@@ -56,7 +56,7 @@
 </style>
 </head>
 <body>
-<header class="top"><div class="shell top-inner"><div class="brand"><div class="brand-icon"><img src="/api/dashboard-image?slot=dashboard-logo" alt="Gary’s Quick Delivery Service logo"/></div><div><h1>Helper Dashboard</h1><p>Shifts, availability and pay</p></div></div><div class="live" id="connection-status"><span class="dot"></span>Live data</div></div></header>
+<header class="top"><div class="shell top-inner"><div class="brand"><div class="brand-icon"><img src="/icons/gqs-icon-192.png" alt="Gary’s Quick Delivery Service logo"/></div><div><h1>Helper Dashboard</h1><p>Shifts, availability and pay</p></div></div><div class="live" id="connection-status"><span class="dot"></span>Live data</div></div></header>
 <main class="shell">
 <section aria-labelledby="overview-tab" class="view active" id="overview">
 <div class="section-title">Your staff profile</div>
@@ -68,13 +68,14 @@
 <div class="facts"><div class="fact"><b id="next-gross">—</b><span>Target gross</span></div><div class="fact"><b id="next-trips">—</b><span>Target trips</span></div><div class="fact"><b id="next-pay">—</b><span>Est. helper pay</span></div><div class="fact"><b id="next-hours">—</b><span>Planned time</span></div></div>
 <div class="status" id="next-quest">Quest status will appear when live data loads.</div>
 
-</div></article><div class="section-title">Work controls</div><article class="card"><div class="card-pad"><a class="link-card control-link" href="https://app.notion.com/p/1735a933ee5045bc91cefffb6e4f49a1" rel="noopener" style="width:100%" target="_blank"><span class="ico">✅</span><div><b>Shift availability</b><small>Submit or update your availability</small></div><span class="chev">›</span></a></div></article>
+</div></article>
 <div class="section-title">Current-week progress</div>
 <article class="card"><div class="live-graphic week-graphic"><div class="graphic-kicker">MONDAY–SUNDAY · LIVE FROM EARNINGS LOG</div><h3 id="week-dates">Current week</h3><div class="graphic-stats"><div><b id="week-shifts">—</b><span>Worked helper shifts</span></div><div><b id="week-hours">—</b><span>Helper time</span></div><div><b id="week-earned">—</b><span>Earned</span></div><div><b id="week-paid">—</b><span>Paid this week</span></div><div><b id="week-outstanding">—</b><span>Outstanding on these shifts</span></div></div><p class="graphic-footer" id="week-caption">Waiting for live weekly data…</p></div></article>
 </section>
 <section aria-labelledby="shifts-tab" class="view" id="shifts">
 <div class="section-title">Live shift graphic</div>
-<article class="card"><div class="media-wrap shift-image-wrap"><img id="live-shift-image" class="media live-shift-image" src="/api/dashboard-image?slot=shift-graphic" alt="Current live helper shift graphic from Notion Graphic Control" loading="eager"/><p class="caption" id="live-shift-image-caption">Live graphic synced from Notion Graphic Control.</p></div></article>
+<article class="card"><div class="media-wrap shift-image-wrap"><img id="live-shift-image" class="media live-shift-image" src="/api/dashboard-image?index=1&amp;v=2" alt="Current live helper shift graphic from Notion Graphic Control" loading="eager"/><p class="caption" id="live-shift-image-caption">Live graphic synced from Notion Graphic Control.</p></div></article>
+<div class="section-title">Work controls</div><article class="card"><div class="card-pad"><a class="link-card control-link" href="https://app.notion.com/p/1735a933ee5045bc91cefffb6e4f49a1" rel="noopener" style="width:100%" target="_blank"><span class="ico">✅</span><div><b>Shift availability</b><small>Submit or update your availability</small></div><span class="chev">›</span></a></div></article>
 <div class="section-title">Your shift requests</div>
 <article class="card"><div class="card-pad"><p class="sub" id="my-requests-status">Sign in to view requests submitted under your staff profile.</p><ul class="list" id="my-requests-list" style="margin-top:10px"></ul></div></article>
 <div class="section-title">Recent completed shift</div>
@@ -82,9 +83,12 @@
 </section>
 <section aria-labelledby="pay-tab" class="view" id="pay">
 <div class="section-title">Current pay</div>
-<article class="card"><div class="card-pad"><div class="amount-row"><div><p class="sub" style="margin-bottom:8px">Currently owed</p><div class="amount" id="owed-amount">—</div></div><span class="tag">Outstanding</span></div><p class="sub" id="owed-detail" style="margin-top:13px">Live outstanding balance from the Notion Earnings Log.</p></div></article>
+<div class="section-title">Current-week progress</div>
+<article class="card"><div class="live-graphic week-graphic"><div class="graphic-kicker">MONDAY–SUNDAY · LIVE FROM EARNINGS LOG</div><h3 id="pay-week-dates">Current week</h3><div class="graphic-stats"><div><b id="pay-week-shifts">—</b><span>Worked helper shifts</span></div><div><b id="pay-week-hours">—</b><span>Helper time</span></div><div><b id="pay-week-earned">—</b><span>Earned</span></div><div><b id="pay-week-paid">—</b><span>Paid this week</span></div><div><b id="pay-week-outstanding">—</b><span>Outstanding on these shifts</span></div></div><p class="graphic-footer" id="pay-week-caption">Waiting for live weekly data…</p></div></article>
 <div class="section-title">Latest payment</div>
-<article class="card"><div class="card-pad"><div class="amount-row"><div><b id="latest-payment" style="font-size:20px">—</b><p class="sub" id="payment-reference">No payment loaded</p></div><span class="paid" id="payment-status">Paid</span></div><ul class="list" id="payment-breakdown" style="margin-top:12px"></ul></div></article>
+<article class="card"><div class="card-pad"><div class="amount-row"><div><b id="latest-payment" style="font-size:20px">—</b><p class="sub" id="payment-reference">No payment loaded</p></div><span class="paid" id="payment-status">Paid</span></div></div></article>
+<div class="section-title">Pay breakdowns</div>
+<article class="card"><div class="card-pad"><ul class="list" id="payment-breakdown"></ul></div></article>
 <article class="card"><a class="link-card card-pad" href="https://www.notion.so/aed02957bc3b43e48d4d5194b86092b9" rel="noopener" target="_blank"><span class="ico">🤝</span><div><b>Helper Day Pay Agreement</b><small>Open the current working agreement</small></div><span class="chev">›</span></a></article>
 </section>
 
@@ -160,7 +164,7 @@
           set('next-gross',null);set('next-trips',null);set('next-pay',null);set('next-hours',null);set('next-quest','Quest status unavailable');
           set('owed-amount',null);set('owed-detail','Live Notion connection unavailable — no balance shown.');
           set('latest-payment',null);set('payment-reference','Payment data unavailable');set('payment-status','Unavailable');
-          set('week-caption','Live weekly data unavailable');set('week-shifts','—');set('week-hours','—');set('week-earned','—');set('week-paid','—');set('week-outstanding','—');
+          set('week-caption','Live weekly data unavailable');set('week-shifts','—');set('week-hours','—');set('week-earned','—');set('week-paid','—');set('week-outstanding','—');set('pay-week-caption','Live weekly data unavailable');set('pay-week-shifts','—');set('pay-week-hours','—');set('pay-week-earned','—');set('pay-week-paid','—');set('pay-week-outstanding','—');
           return;
         }
         if(status){status.classList.remove('sync-error');status.innerHTML='<span class="dot"></span>Live data'}
@@ -175,6 +179,7 @@
         const breakdown=document.getElementById('payment-breakdown');if(breakdown){breakdown.innerHTML='';if(Array.isArray(pay.breakdown)&&pay.breakdown.length){pay.breakdown.forEach(x=>{const li=document.createElement('li'),ico=document.createElement('span'),body=document.createElement('div'),b=document.createElement('b'),small=document.createElement('small');ico.className='ico';ico.textContent='✓';b.textContent=x.label||'Payment entry';small.textContent=x.detail||'';body.append(b,small);li.append(ico,body);breakdown.append(li)})}else{const li=document.createElement('li');li.textContent='No payment breakdown available.';breakdown.append(li)}}
         set('week-dates',w.weekStart&&w.weekEnd?`${new Date(w.weekStart+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'})} – ${new Date(w.weekEnd+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}`:'Current week');
         set('week-shifts',w.shiftCount??'—');set('week-hours',hoursText(w.hours));set('week-earned',money(w.earned));set('week-paid',money(w.paid));set('week-outstanding',money(w.outstanding));set('week-caption',w.caption||'Weekly totals calculated from completed helper earnings records.');
+        set('pay-week-dates',w.weekStart&&w.weekEnd?`${new Date(w.weekStart+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'})} – ${new Date(w.weekEnd+'T12:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'})}`:'Current week');set('pay-week-shifts',w.shiftCount??'—');set('pay-week-hours',hoursText(w.hours));set('pay-week-earned',money(w.earned));set('pay-week-paid',money(w.paid));set('pay-week-outstanding',money(w.outstanding));set('pay-week-caption',w.caption||'Weekly totals calculated from completed helper earnings records.');
       }catch(e){console.warn('Dashboard live-data load failed',e);if(status){status.classList.add('sync-error');status.innerHTML='<span class="dot"></span>Sync unavailable'}set('owed-amount',null);set('owed-detail','Live Notion connection unavailable — no balance shown.');set('week-caption','Live weekly data unavailable');}
     }
     const liveShiftImage=document.getElementById('live-shift-image');

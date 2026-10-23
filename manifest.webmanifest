@@ -8,7 +8,7 @@
   "theme_color": "#0b1a2d",
   "description": "Live helper shifts, availability and pay progress.",
   "icons": [
-    {"src":"/api/dashboard-image?slot=dashboard-logo","sizes":"192x192","type":"image/png","purpose":"any"},
-    {"src":"/api/dashboard-image?slot=dashboard-logo","sizes":"512x512","type":"image/png","purpose":"any maskable"}
+    {"src":"/icons/gqs-icon-192.png","sizes":"192x192","type":"image/png","purpose":"any"},
+    {"src":"/icons/gqs-icon-512.png","sizes":"512x512","type":"image/png","purpose":"any maskable"}
   ]
 }

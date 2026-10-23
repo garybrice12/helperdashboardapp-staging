@@ -1,10 +1,5 @@
-// Serve the current image from a specifically named toggle in Notion Graphic Control.
-// The toggle name is the source-of-truth key; never rely on image order/index.
+// The live shift image is owned by the Notion Graphic Control page, not the dashboard page.
 const NOTION_PAGE_ID = process.env.NOTION_GRAPHIC_CONTROL_PAGE_ID || '3eef475c-d2eb-812d-ace1-c978b4ec3b73';
-const SLOT_TITLES = {
-  'dashboard-logo': 'Dashboard logo',
-  'shift-graphic': 'Shift graphic'
-};
 
 async function notionChildren(blockId) {
   const token = process.env.NOTION_TOKEN;
@@ -26,53 +21,26 @@ async function notionChildren(blockId) {
   return all;
 }
 
-function blockText(block) {
-  const payload = block?.[block?.type];
-  const richText = payload?.rich_text || payload?.title || [];
-  return Array.isArray(richText) ? richText.map(part => part.plain_text || part.text?.content || '').join('').trim() : '';
-}
-
-function imageUrl(block) {
-  const image = block?.type === 'image' ? block.image : null;
-  return image?.type === 'file' ? image.file?.url : image?.type === 'external' ? image.external?.url : null;
-}
-
-async function findImageInsideNamedToggle(blocks, wantedTitle) {
-  for (const block of blocks) {
-    if (block.type === 'toggle' && blockText(block) === wantedTitle) {
-      const image = await findFirstImage(await notionChildren(block.id));
-      if (image) return image;
-      throw new Error(`The “${wantedTitle}” toggle exists but contains no image`);
+async function findImages(items, out = []) {
+  for (const block of items) {
+    if (block.type === 'image') {
+      const image = block.image || {};
+      const url = image.type === 'file' ? image.file?.url : image.type === 'external' ? image.external?.url : null;
+      if (url) out.push(url);
     }
-    if (block.has_children) {
-      const nested = await findImageInsideNamedToggle(await notionChildren(block.id), wantedTitle);
-      if (nested) return nested;
-    }
+    if (block.has_children) await findImages(await notionChildren(block.id), out);
   }
-  return null;
-}
-
-async function findFirstImage(blocks) {
-  for (const block of blocks) {
-    const url = imageUrl(block);
-    if (url) return url;
-    if (block.has_children) {
-      const nested = await findFirstImage(await notionChildren(block.id));
-      if (nested) return nested;
-    }
-  }
-  return null;
+  return out;
 }
 
 export default async (req) => {
   try {
-    const requestUrl = new URL(req.url);
-    const slot = requestUrl.searchParams.get('slot') || 'shift-graphic';
-    const toggleTitle = SLOT_TITLES[slot];
-    if (!toggleTitle) return new Response('Unknown image slot.', { status: 400 });
-
-    const sourceUrl = await findImageInsideNamedToggle(await notionChildren(NOTION_PAGE_ID), toggleTitle);
-    if (!sourceUrl) return new Response(`No image found inside the “${toggleTitle}” toggle in Graphic Control.`, { status: 404 });
+    const requestedIndex = new URL(req.url).searchParams.get('index');
+    // Graphic Control contains an introductory image first and the actual current-shift graphic second.
+    const index = Math.max(0, Number(requestedIndex ?? 1));
+    const images = await findImages(await notionChildren(NOTION_PAGE_ID));
+    const sourceUrl = images[index] || images[1] || images[0] || images[images.length - 1];
+    if (!sourceUrl) return new Response(`No dashboard image found.`, { status: 404 });
 
     const imageResponse = await fetch(sourceUrl);
     if (!imageResponse.ok) return new Response('Notion image could not be fetched.', { status: 502 });
@@ -81,13 +49,12 @@ export default async (req) => {
       headers: {
         'Content-Type': imageResponse.headers.get('content-type') || 'image/png',
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
-        Pragma: 'no-cache',
-        Expires: '0'
+        Pragma: 'no-cache'
       }
     });
   } catch (error) {
     console.error('Dashboard image sync failed', error?.message || error);
-    return new Response('Dashboard image unavailable.', { status: 503, headers: { 'Cache-Control': 'no-store' } });
+    return new Response('Dashboard image unavailable.', { status: 503 });
   }
 };
 
