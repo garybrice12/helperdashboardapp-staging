@@ -467,7 +467,21 @@ function makeLatestPayment(rows) {
 function makeRecentShift(rows) {
   const recent = rows
     .filter(row => row.withHelper && row.date)
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)))[0];
+    .sort((a, b) => {
+      const byDate = String(b.date).slice(0, 10).localeCompare(String(a.date).slice(0, 10));
+      if (byDate) return byDate;
+      // Several helper shifts can be logged on the same date. Pick the latest
+      // shift window rather than whichever Notion returns first.
+      const startMinutes = row => {
+        const time = String(row.shiftTime || extractTime(row.notes) || '').split(/\s*[–-]\s*/)[0];
+        const match = time.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+        if (!match) return -1;
+        let hour = Number(match[1]);
+        if (match[3]) { if (match[3].toLowerCase() === 'pm' && hour < 12) hour += 12; if (match[3].toLowerCase() === 'am' && hour === 12) hour = 0; }
+        return hour * 60 + Number(match[2]);
+      };
+      return startMinutes(b) - startMinutes(a);
+    })[0];
   if (!recent) {
     return {
       date: '',

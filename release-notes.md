@@ -57,3 +57,16 @@ Weekly selector regression correction (23 Oct 2026):
 - Weekly rows are filtered to valid ISO dates before week options are built.
 - Duplicate prevention uses Notion page IDs when available and a stable row fingerprint when IDs are missing, avoiding accidental collapse of multiple records with missing IDs.
 - Historical week options remain derived from all dated earnings rows returned by the data endpoint.
+
+
+## Header icon removal
+- Removed the separate logo tile from the dashboard header; the title and live-data status remain.
+- Browser and installed-app icon references now use the Graphic Control `shift` asset rather than the misaligned logo asset.
+- The live shift graphic section remains the dashboard's visual graphic.
+
+
+## Graphic Control icon cleanup — 23 October 2026
+- Browser favicon, Apple touch icon, and installed-app manifest all reference `/api/dashboard-image?asset=shift&v=graphic-control`, which resolves the Shift graphic from Notion Graphic Control.
+- Removed unused static PNG icon assets and the obsolete `.brand-icon` styling.
+- Removed the hard-coded PNG type/size assumption from the browser favicon link.
+- No deployment was performed.

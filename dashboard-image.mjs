@@ -30,11 +30,11 @@ function imageUrl(block) {
   return image.type === 'file' ? image.file?.url : image.type === 'external' ? image.external?.url : null;
 }
 
-async function findShiftGraphic(blocks) {
+async function findNamedGraphic(blocks, targetLabel) {
   for (const block of blocks || []) {
     const typeData = block[block.type] || {};
     const label = plainText(typeData.rich_text || typeData.title || []);
-    if (block.type === 'toggle' && /^shift graphic$/i.test(label)) {
+    if (block.type === 'toggle' && new RegExp('^' + targetLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i').test(label)) {
       const nested = await notionChildren(block.id);
       for (const child of nested) {
         if (child.type === 'image') {
@@ -49,7 +49,7 @@ async function findShiftGraphic(blocks) {
     }
     if (block.has_children) {
       const nested = await notionChildren(block.id);
-      const url = await findShiftGraphic(nested);
+      const url = await findNamedGraphic(nested, targetLabel);
       if (url) return url;
     }
   }
@@ -69,10 +69,11 @@ async function findFirstImageInChildren(blockId) {
   return null;
 }
 
-export default async () => {
+export default async (request) => {
   try {
-    const sourceUrl = await findShiftGraphic(await notionChildren(NOTION_PAGE_ID));
-    if (!sourceUrl) return new Response('No image found inside the Shift graphic control.', { status: 404 });
+    const asset = new URL(request.url).searchParams.get('asset') === 'logo' ? 'Dashboard logo' : 'Shift graphic';
+    const sourceUrl = await findNamedGraphic(await notionChildren(NOTION_PAGE_ID), asset);
+    if (!sourceUrl) return new Response(`No image found inside the ${asset} control.`, { status: 404 });
     const imageResponse = await fetch(sourceUrl);
     if (!imageResponse.ok) return new Response('Notion image could not be fetched.', { status: 502 });
     return new Response(imageResponse.body, {
