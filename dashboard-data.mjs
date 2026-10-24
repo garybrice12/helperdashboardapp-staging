@@ -588,7 +588,24 @@ export function buildDashboardData({
   const today = ukISODate(now);
   const recentShift = makeRecentShift(rows);
   const outstandingKnown = !outstandingError && outstandingValue !== null && outstandingValue !== undefined;
-  const currentlyOwed = outstandingKnown ? roundMoney(outstandingValue) : null;
+  // Prefer the live Helper Pay Summary rollup. If it is unavailable, derive the
+  // total from the same Earnings Log rows used by Current-week progress rather
+  // than showing a blank or a misleading £0.00.
+  const earningsOutstandingKnown = rows.some(row =>
+    row.withHelper && row.date && (
+      row.helperOutstanding !== null && row.helperOutstanding !== undefined ||
+      row.helperPayout !== null && row.helperPayout !== undefined ||
+      row.helperPaid !== null && row.helperPaid !== undefined
+    )
+  );
+  const earningsOutstanding = rows.reduce((sum, row) => {
+    if (!row.withHelper || !row.date) return sum;
+    const balance = row.helperOutstanding ?? Math.max(0, (row.helperPayout || 0) - (row.helperPaid || 0));
+    return sum + Math.max(0, Number(balance) || 0);
+  }, 0);
+  const currentlyOwed = outstandingKnown
+    ? roundMoney(outstandingValue)
+    : earningsOutstandingKnown ? roundMoney(earningsOutstanding) : null;
   return {
     version: 2,
     updatedAt: now.toISOString(),
@@ -596,7 +613,7 @@ export function buildDashboardData({
     recentShift,
     latestPayment: makeLatestPayment(rows),
     currentlyOwed,
-    outstandingSyncError: !outstandingKnown,
+    outstandingSyncError: !outstandingKnown && !earningsOutstandingKnown,
     currentWeek: makeCurrentWeek(rows, now),
     upcomingShifts: shiftError ? [] : makeLiveUpcomingShifts(shiftPages, today),
     shiftSyncError: Boolean(shiftError),
