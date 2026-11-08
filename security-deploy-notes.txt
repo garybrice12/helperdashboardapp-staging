@@ -1,0 +1,33 @@
+HELPER DASHBOARD — SECURITY LOGIN UPDATE (TESTING ONLY)
+Build date: 27 October 2026
+
+INCLUDED
+- Search staff by the beginning of their name or three-digit Staff ID.
+- Results show Staff ID next to staff name; the helper chooses an exact record.
+- Server verifies selected Notion page ID, Staff ID, name, active/suspended state and PIN together.
+- Account-specific escalating lockout state persists in Netlify Blobs: 3 failures / 15 minutes, 6 / 1 hour, 9 / 24 hours, 12 / admin override.
+- Lockout status and countdown are refreshed from server state after selecting a staff member and after page reload.
+- Additional IP/network-based attempt limiting.
+- Successful login resets the account failure count.
+- One active session per staff account. A new login replaces the stored active session ID; protected API requests reject the older session, and the old page checks every 15 seconds to return to sign-in.
+- Last successfully used staff name and ID are remembered locally on that device; PIN is never saved.
+- Admin can clear a selected account's lockout or clear all lockouts; existing audit mechanism is used.
+- Session signing requires HELPER_SESSION_SECRET; no fallback to NOTION_TOKEN remains in login/session-auth/admin/request auth.
+
+REQUIRED NOTION SETUP BEFORE TESTING LOGIN
+1. In the Staff Profiles data source, add a property named exactly "Staff ID".
+2. Use a text/rich-text property (not a number property), so leading zeros are preserved.
+3. Give every active staff member a unique three-digit value, e.g. 000, 001, 002. Do not reuse IDs.
+4. Check that each profile has a Name, Staff Status, Access Suspended, and Helper PIN property populated as expected.
+5. The app intentionally hides active profiles with missing/invalid/duplicate IDs. It shows a setup warning on the login screen.
+
+TEST ON helperdashapp-testing ONLY
+- Do not deploy this build to the live helperdashboardapp until tests pass.
+- Test valid login; wrong PIN; wrong ID/name/PIN combination; 3/6/9/12 failure thresholds; lockout after refresh; admin per-account override; admin clear-all; successful login resets account failures; sign in on device B then verify device A is signed out within approximately 15 seconds; verify device A's protected API requests fail immediately after session replacement; logout then sign in again.
+- Verify admin controls still work and normal staff cannot use them.
+
+LIMITATIONS / REVIEW
+- This build was syntax-checked and the archive integrity is checked. It has not been deployed to or end-to-end tested against the live Notion/Netlify services by this build process.
+- Existing Helper PIN values remain in the current Notion property format for compatibility; PIN hashing/reset migration is not included in this release.
+- Netlify Blobs does not provide a compare-and-swap transaction in this implementation. Concurrent failed attempts can race; for a high-assurance production lockout, use a transactional/atomic store or Netlify's managed rate limiting for attempt counters.
+- The next separate phase is per-staff data isolation: each signed-in helper must only receive their own shifts, requests, pay and related information. This release does not claim that all existing data endpoints have been converted to per-staff filtering.

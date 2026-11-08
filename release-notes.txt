@@ -1,0 +1,28 @@
+Helper Dashboard full-fixes candidate — 27 October 2026
+
+Based on the latest user-supplied V2 messaging-fix package.
+
+Implemented in this candidate:
+- Published announcements are read from the Home Announcements Notion data source, filtered by Published status and publish/expiry dates, with a legacy Graphic Control fallback.
+- Admin panel is only shown to an authenticated staff member whose Staff Profile has Admin Access enabled.
+- Server-side admin actions validate the signed session, active employment status, Admin Access and Access Suspended flags. Shared admin key is not sent from the browser.
+- Admin can force sign-out, suspend access, restore access, and sign out all staff. Suspend/restore requires a reason; events are logged to Netlify Blobs.
+- Login Status and Last Seen are updated on sign-in, active session checks, logout, expiry and admin revocation where the Notion connection permits.
+- Suspended profiles are denied new sign-in and shift-request access.
+- Existing Home, Shifts, Pay, Tools, News, support, shift request and AI flows are retained in the candidate.
+- WhatsApp support is a direct one-to-one chat link to the configured business number, not a group invitation.
+
+Validation completed:
+- Netlify function syntax checks passed.
+- Inline browser JavaScript syntax check passed.
+- Mocked Home Announcements query test returned the expected published test heading/message.
+- ZIP integrity check passed.
+
+Not yet validated:
+- No live Notion API test with production secrets.
+- No Netlify preview browser/device test.
+- No production deployment. Do not treat this candidate as live until preview tests pass.
+
+PIN controls placement update: Change PIN is now a collapsed toggle directly beneath Your Staff Profile on Home. The PIN form expands only when requested; it has been removed from Tools.
+
+Profile PIN toggle visual refinement: blue-tinted full-width toggle directly below staff profile, lock icon, plus when collapsed and chevron when expanded; panel remains collapsed by default.

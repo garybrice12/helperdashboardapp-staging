@@ -1,3 +1,4 @@
+import { requireStaffSession, authFailure } from './session-auth.mjs';
 import { getStore } from '@netlify/blobs';
 
 const STORE_NAME = 'helper-dashboard-data';
@@ -12,7 +13,7 @@ const DEFAULT_DATA = {
 async function getSafeData(req) {
   try {
     const origin = new URL(req.url).origin;
-    const response = await fetch(new URL('/api/dashboard-data', origin), { headers: { 'Cache-Control': 'no-cache' } });
+    const response = await fetch(new URL('/api/dashboard-data', origin), { headers: { 'Cache-Control': 'no-cache', cookie: req.headers.get('cookie') || '' } });
     if (!response.ok) throw new Error(`Dashboard data returned ${response.status}`);
     const data = await response.json();
     if (data?.dataUnavailable || data?.earningsSyncError) throw new Error('Live dashboard data unavailable');
@@ -21,6 +22,13 @@ async function getSafeData(req) {
     console.error('Helper AI live data read failed', error?.message || error);
     return null;
   }
+}
+
+function authenticatedStaffName(staff) {
+  const properties = staff?.properties || {};
+  const value = properties.Name || properties['Staff Name'];
+  const parts = value?.type === 'title' ? value.title : value?.type === 'rich_text' ? value.rich_text : [];
+  return (parts || []).map(part => part.plain_text || part.text?.content || '').join('').trim().slice(0, 80);
 }
 
 function fallback(question, data) {
@@ -59,21 +67,70 @@ function fallback(question, data) {
   return null;
 }
 
+async function logUnansweredQuestion(question, staffName, reason) {
+  try {
+    const token = process.env.NOTION_TOKEN;
+    if (!token) throw new Error('NOTION_TOKEN is not configured');
+    const feedback = `Unanswered AI question\nStaff: ${staffName || 'Not supplied'}\nQuestion: ${question}\nReason: ${reason}\nLogged at: ${new Date().toISOString()}`.slice(0, 3000);
+    const response = await fetch('https://api.notion.com/v1/pages', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Notion-Version': '2025-09-03', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        parent: { data_source_id: '34e1bc20-8f43-4b45-84a1-0cf9de860264' },
+        properties: {
+          Name: { title: [{ text: { content: `Unanswered AI question — ${new Date().toLocaleString('en-GB', { timeZone: 'Europe/London' })}` } }] },
+          Feedback: { rich_text: [{ text: { content: feedback } }] },
+          'Feedback type': { select: { name: 'Other' } },
+          'App area': { select: { name: 'Ask AI' } },
+          'Review status': { status: { name: 'New' } }
+        }
+      })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error('Unanswered AI question log failed', response.status, result?.code || 'unknown');
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('Unanswered AI question log failed', error?.message || error);
+    return false;
+  }
+}
+
+function supportResponse(logged) {
+  const response = { answer: logged ? 'I can’t confirm the answer to that yet. Your question has been logged for Gary to review. Please contact the Helper Support WhatsApp group if you need help now.' : 'I can’t confirm the answer to that yet, and I couldn’t save the question for review automatically. Please use the support ticket in Tools so Gary can review it.', mode: 'unanswered', logged };
+  const supportText = '❗ HELPER SUPPORT REQUEST\n\nPlease describe the issue you need help with.';
+  const defaultSupportUrl = 'https://chat.whatsapp.com/GlhBIZwKo2kKAooHMiSbpq?s=cl&p=a&mlu=4&ilr=4&iam=2';
+  const configuredSupportUrl = (process.env.WHATSAPP_SUPPORT_URL || '').trim();
+  try {
+    const parsed = new URL(configuredSupportUrl);
+    if (parsed.protocol === 'https:' && parsed.hostname.toLowerCase() === 'chat.whatsapp.com' && /^\/[A-Za-z0-9]+\/?$/.test(parsed.pathname)) response.supportUrl = configuredSupportUrl;
+    else response.supportUrl = defaultSupportUrl;
+  } catch { response.supportUrl = defaultSupportUrl; }
+  return Response.json(response);
+}
+
 export default async (req) => {
   if (req.method !== 'POST') return Response.json({ error:'Please send a question from the dashboard.' }, { status:405 });
+  const auth = await requireStaffSession(req);
+  if (!auth.ok) return authFailure(auth);
   let body; try { body = await req.json(); } catch { return Response.json({ error:'That question could not be read.' }, { status:400 }); }
   const question = typeof body.question === 'string' ? body.question.trim() : '';
+  const staffName = authenticatedStaffName(auth.staff);
   if (!question || question.length > 500) return Response.json({ error:'Please enter a question of up to 500 characters.' }, { status:400 });
   const data = await getSafeData(req);
   if (!data) {
     const answer = fallback(question, null);
-    return answer ? Response.json({ answer, mode:'safe-fallback' }) : Response.json({ error:'Live dashboard data is unavailable, so I cannot answer that accurately. Please try again after sync is restored.' }, { status:503 });
+    if (answer) return Response.json({ answer, mode:'safe-fallback' });
+    return supportResponse(await logUnansweredQuestion(question, staffName, 'Live dashboard data unavailable; no approved fallback answer.'));
   }
   const apiKey = process.env.OPENAI_API_KEY;
-  const approvedContext = `You are Helper Assistant inside Gary Brice's Helper Dashboard. Answer the exact question asked. Use only the live dashboard data supplied below and general explanations of how the dashboard works. Never invent shifts, response deadlines, pay, Quest values or commitments. If a value is missing, say it is not recorded instead of guessing or reporting £0. Gary makes final shift changes, attendance confirmations and payment decisions. For pay questions distinguish earned helper pay before adjustments from actual payment and outstanding balance after adjustments. DASHBOARD DATA: ${JSON.stringify(data)}`;
+  const approvedContext = `You are Helper Assistant inside Gary Brice's Helper Dashboard. Answer the exact question asked. Use only the live dashboard data supplied below and general explanations of how the dashboard works. Never invent shifts, response deadlines, pay, Quest values or commitments. If a value is missing, say it is not recorded instead of guessing or reporting £0. Gary makes final shift changes, attendance confirmations and payment decisions. For shift questions, treat the live dashboard fields as authoritative: use the shift date, start/end times and location supplied in the live data, not any older or duplicated text in a shift title. Never repeat a date, time or location twice in the same shift description. If the live fields conflict, say the record needs checking rather than choosing one. For pay questions distinguish earned helper pay before adjustments from actual payment and outstanding balance after adjustments. If the question cannot be answered accurately from the supplied data and approved general guidance, respond with exactly the single word UNANSWERED and nothing else. DASHBOARD DATA: ${JSON.stringify(data)}`;
   if (!apiKey) {
     const answer = fallback(question, data);
-    return answer ? Response.json({ answer, mode:'approved-fallback' }) : Response.json({ error:'I do not have that confirmed information. Please ask Gary.' }, { status:503 });
+    if (answer) return Response.json({ answer, mode:'approved-fallback' });
+    return supportResponse(await logUnansweredQuestion(question, staffName, 'No API key and no approved fallback answer.'));
   }
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -84,16 +141,16 @@ export default async (req) => {
     if (!response.ok) {
       const approved = fallback(question, data);
       if (approved) return Response.json({ answer: approved, mode:'approved-fallback' });
-      return Response.json({ error:'The assistant could not answer right now. Please try again shortly.' }, { status:502 });
+      return supportResponse(await logUnansweredQuestion(question, staffName, `AI provider returned HTTP ${response.status}; no approved fallback answer.`));
     }
     const answer = result.output_text || (result.output || []).flatMap(item=>item.content||[]).filter(item=>item.type==='output_text').map(item=>item.text).join('\n').trim();
-    if (!answer) return Response.json({ error:'The assistant returned an empty answer. Please try again.' }, { status:502 });
+    if (!answer || /^UNANSWERED[.!]?$/i.test(answer.trim())) return supportResponse(await logUnansweredQuestion(question, staffName, 'AI marked the question as not answerable from approved context.'));
     return Response.json({ answer });
   } catch (error) {
     console.error('Helper Assistant request failed', error?.message || error);
     const approved = fallback(question, data);
     if (approved) return Response.json({ answer: approved, mode:'approved-fallback' });
-    return Response.json({ error:'The assistant is temporarily unavailable. Please try again shortly.' }, { status:502 });
+    return supportResponse(await logUnansweredQuestion(question, staffName, 'AI request failed and no approved fallback answer was available.'));
   }
 };
 

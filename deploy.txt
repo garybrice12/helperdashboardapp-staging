@@ -19,3 +19,15 @@ LIVE DATA CONTRACT (updated 15 October 2026)
 - Only future Work Planner shifts with Status Confirmed or Live and Crew With helper are shown as upcoming. Available shifts are not treated as confirmed.
 - If the Notion connection fails, the dashboard shows a sync-unavailable state instead of presenting old example figures as live.
 - App icon assets are in /icons and use the Gary’s Quick Delivery Service emblem.
+
+
+Form clarity update (25 October 2026): required fields use red dots, optional fields yellow dots, and conditional fields grey dots. The legend is concise. Multi-shift help text now states that one submission creates one pending request containing all selected shifts.
+
+
+WhatsApp support link update (27 October 2026): support link defaults to a Helper Support WhatsApp group invite with a prefilled support message. WHATSAPP_SUPPORT_URL may override it with a valid HTTPS wa.me direct-chat URL. Group invite links are not accepted.
+
+
+v6.0.5.0 candidate additions:
+- Deploy netlify/functions/admin-shift-management.mjs with the rest of the Netlify Functions.
+- The endpoint uses existing NOTION_TOKEN and HELPER_SESSION_SECRET plus the existing Staff Profiles, Helper Shift Requests, Work Planner — Shifts and Completed Helper Shifts data sources. Optional override: NOTION_COMPLETED_SHIFTS_DATA_SOURCE_ID.
+- Stage this candidate first. Test with an admin account and a non-admin helper account before promoting. Do not drag-and-drop as a static-only deploy; preserve the existing Netlify Functions build pipeline.

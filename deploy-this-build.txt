@@ -1,21 +1,22 @@
-HELPER DASHBOARD — CONSOLIDATED BUILD
+GQDS HELPER DASHBOARD v6.0.5.15 — CLEARER ADMIN OVERVIEW
 
-Deploy this folder to the EXISTING helperdashboardapp Netlify site. Do not connect or push to GitHub for this manual deployment.
+This preview candidate separates the admin Home screen into:
+- MY ACTIVITY — owner weekly/monthly retained earnings, shift count and hours.
+- HELPER ACTIVITY — helper shifts involving the owner, payments made this week and outstanding helper pay on those shifts.
+- COMBINED VIEW — weekly summary of the owner's recorded shifts and the related helper payment position.
 
-Included: branding, graphic fit without cropping, Tools navigation label, Restaurant Timer link, completed-shift helper pay before signed adjustments, weekly helper-time fallback, and AI live-data/question-routing fixes.
+Presentation-only. No formulas, existing calculations, Notion records, API endpoints, permissions or helper-facing screens changed. The helper metrics are not an all-staff payroll report. The package was built from the available v6.0.5.14 source tree; its identity against the currently published production bundle has not been independently verified. Treat as preview-only until the production baseline is confirmed.
 
-On a computer with Node.js installed:
-1. Extract this ZIP.
-2. Open a terminal in the extracted folder.
-3. Run: npm install
-4. Run: npx netlify login
-5. Run: npx netlify link (select the existing helperdashboardapp site)
-6. Run: npx netlify deploy --prod
+DEPLOYMENT
+- Deploy the full ZIP to a Netlify Deploy Preview first; it contains Netlify Functions.
+- Preserve all current Netlify environment variables and production deployment.
+- Do not use a static-only upload.
+- Do not promote to production until Gary has reviewed and explicitly approved the preview.
 
-Keep existing environment variables, especially NOTION_TOKEN and OPENAI_API_KEY. This deployment does not grant Notion permissions.
-
-After deploying, check /api/dashboard-data and test AI questions: “When is the next shift?”, “When must I respond?”, “How is helper pay calculated?” and “How much is outstanding?”.
-
-Important: the Restaurant Timer menu item opens the existing Notion timer test page; full native integration needs the actual timer HTML source package, which was not present in the recovered project.
-
-- Added authenticated staff request listing filtered by exact staff-profile name. For stronger identity isolation, add a Staff Profile relation to the request database in a later schema update.
+PREVIEW CHECKS
+1. Sign in as Gary (Admin): confirm the three sections appear in the stated order and are visually distinct.
+2. Confirm owner figures use existing owner earnings values and helper figures are clearly labelled as shifts involving the owner.
+3. Confirm the combined summary uses the existing current-week values.
+4. Sign in as a non-admin helper: confirm the admin overview is hidden and the existing helper weekly summary remains unchanged.
+5. Check mobile and desktop, dark mode, refresh, navigation, and all existing admin controls.
+6. Run the full regression suite and confirm no existing features regress.

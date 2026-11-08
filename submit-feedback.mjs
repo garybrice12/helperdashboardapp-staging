@@ -1,3 +1,4 @@
+import { requireStaffSession, authFailure } from './session-auth.mjs';
 const FEEDBACK_DATA_SOURCE_ID = '34e1bc20-8f43-4b45-84a1-0cf9de860264';
 
 function notionHeaders() {
@@ -14,18 +15,28 @@ function cleanText(value, maxLength) {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 }
 
+function authenticatedStaffName(staff) {
+  const properties = staff?.properties || {};
+  const value = properties.Name || properties['Staff Name'];
+  const parts = value?.type === 'title' ? value.title : value?.type === 'rich_text' ? value.rich_text : [];
+  return (parts || []).map(part => part.plain_text || part.text?.content || '').join('').trim().slice(0, 80);
+}
+
 export default async (req) => {
   if (req.method !== 'POST') return Response.json({ error: 'Use the feedback form to submit feedback.' }, { status: 405 });
+  const auth = await requireStaffSession(req);
+  if (!auth.ok) return authFailure(auth);
   let body;
   try { body = await req.json(); } catch { return Response.json({ error: 'The feedback form could not be read.' }, { status: 400 }); }
 
-  const name = cleanText(body.name, 80);
+  const name = authenticatedStaffName(auth.staff);
   const feedback = cleanText(body.feedback, 3000);
   const type = cleanText(body.type, 40);
   const area = cleanText(body.area, 40);
   const allowedTypes = new Set(['Suggestion', 'Problem', 'Compliment', 'Other']);
   const allowedAreas = new Set(['Overview', 'Shifts', 'Pay', 'Ask AI', 'Help & support', 'Other']);
-  if (!name || !feedback) return Response.json({ error: 'Please enter your name and feedback.' }, { status: 400 });
+  if (!name) return Response.json({ error: 'Your staff profile does not contain a display name. Please contact Gary.' }, { status: 403 });
+  if (!feedback) return Response.json({ error: 'Please enter your feedback.' }, { status: 400 });
   if (!allowedTypes.has(type) || !allowedAreas.has(area)) return Response.json({ error: 'Please choose a valid feedback type and app section.' }, { status: 400 });
 
   try {

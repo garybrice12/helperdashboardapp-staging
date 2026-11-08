@@ -1,0 +1,5 @@
+Header refinement
+- Replaced the tall, cropped banner with a compact horizontal branded header featuring the GQS emblem and full company name.
+- Image uses contain sizing and responsive max-height so the logo is not cropped on mobile.
+- Existing Helper Dashboard title row, controls, staff profile, collapsed Change PIN toggle, and other functions retained.
+- Manual Netlify testing ZIP only; no deployment performed.

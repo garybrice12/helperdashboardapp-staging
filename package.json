@@ -1,11 +1,14 @@
 {
   "name": "helper-dashboard",
-  "version": "6.0.0",
+  "version": "6.0.5.17",
   "private": true,
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "@netlify/blobs": "latest"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
   }
 }
